@@ -47,10 +47,21 @@ namespace PolyStrike.Match
             participant.Died += OnParticipantDied;
         }
 
+        private void Start()
+        {
+            var match = MatchRoundManager.Instance;
+            if (match != null)
+                match.StateChanged += OnMatchStateChanged;
+        }
+
         private void OnDestroy()
         {
             if (participant != null)
                 participant.Died -= OnParticipantDied;
+
+            var match = MatchRoundManager.Instance;
+            if (match != null)
+                match.StateChanged -= OnMatchStateChanged;
         }
 
         private void Update()
@@ -217,11 +228,19 @@ namespace PolyStrike.Match
                 return;
 
             bombEquipped = true;
+            ApplyBombInputState();
+            viewmodel?.SetBombMode(true);
+            viewmodel?.PlayDeploy(0.45f);
+        }
+
+        private void ApplyBombInputState()
+        {
+            if (!bombEquipped)
+                return;
+
             utility?.SetExternalInputBlocked(true);
             weapon?.SetExternalInputBlocked(true);
             movement?.SetExternalMaxSpeed(BombMoveSpeed);
-            viewmodel?.SetBombMode(true);
-            viewmodel?.PlayDeploy(0.45f);
         }
 
         private void HolsterBomb()
@@ -270,6 +289,21 @@ namespace PolyStrike.Match
             movement?.SetRoundMovementLocked(roundLocked);
             weapon?.SetExternalInputBlocked(roundLocked || bombEquipped);
             utility?.SetExternalInputBlocked(roundLocked || bombEquipped);
+        }
+
+        private void OnMatchStateChanged()
+        {
+            if (!bombEquipped)
+                return;
+
+            var match = MatchRoundManager.Instance;
+            if (match == null || (match.Phase != RoundPhase.FreezeTime && match.Phase != RoundPhase.Live))
+            {
+                HolsterBomb();
+                return;
+            }
+
+            ApplyBombInputState();
         }
 
         private void OnParticipantDied(MatchParticipant deadParticipant)
