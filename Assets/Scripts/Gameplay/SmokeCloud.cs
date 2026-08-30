@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Rendering;
 
 namespace PolyStrike.Gameplay
 {
@@ -43,12 +44,12 @@ namespace PolyStrike.Gameplay
                 var y = 1f - (i / (float)(CellCount - 1)) * 2f;
                 var horizontal = Mathf.Sqrt(Mathf.Max(0f, 1f - y * y));
                 var angle = goldenAngle * i;
-                var normalized = new Vector3(Mathf.Cos(angle) * horizontal, y * 0.72f, Mathf.Sin(angle) * horizontal);
+                var normalized = new Vector3(Mathf.Cos(angle) * horizontal, y * 0.62f, Mathf.Sin(angle) * horizontal);
 
                 var cell = GameObject.CreatePrimitive(PrimitiveType.Sphere);
                 cell.name = "Duman Hücresi";
                 cell.transform.SetParent(transform, false);
-                cell.transform.localPosition = normalized * radiusMeters * 0.58f + Vector3.up * radiusMeters * 0.23f;
+                cell.transform.localPosition = normalized * radiusMeters * 0.58f + Vector3.up * radiusMeters * 0.32f;
                 cell.transform.localScale = Vector3.one * radiusMeters * Random.Range(0.72f, 0.96f);
 
                 var collider = cell.GetComponent<Collider>();
@@ -56,7 +57,9 @@ namespace PolyStrike.Gameplay
                     Destroy(collider);
 
                 var renderer = cell.GetComponent<Renderer>();
-                renderer.material = GetSmokeMaterial();
+                renderer.sharedMaterial = GetSmokeMaterial();
+                renderer.shadowCastingMode = ShadowCastingMode.Off;
+                renderer.receiveShadows = false;
                 cells.Add(cell.transform);
                 renderers.Add(renderer);
             }
@@ -120,10 +123,8 @@ namespace PolyStrike.Gameplay
             for (var i = Active.Count - 1; i >= 0; i--)
             {
                 var cloud = Active[i];
-                if (cloud == null)
-                    continue;
-
-                cloud.PunchCellsAlongLine(start, end);
+                if (cloud != null)
+                    cloud.PunchCellsAlongLine(start, end);
             }
         }
 
@@ -133,10 +134,8 @@ namespace PolyStrike.Gameplay
             for (var i = Active.Count - 1; i >= 0; i--)
             {
                 var cloud = Active[i];
-                if (cloud == null)
-                    continue;
-
-                cloud.ClearCellsInRadius(center, blastRadius);
+                if (cloud != null)
+                    cloud.ClearCellsInRadius(center, blastRadius);
             }
         }
 
@@ -172,22 +171,29 @@ namespace PolyStrike.Gameplay
             if (smokeMaterial != null)
                 return smokeMaterial;
 
-            var shader = Shader.Find("Universal Render Pipeline/Unlit");
+            var shader = Shader.Find("Universal Render Pipeline/Unlit") ?? Shader.Find("Unlit/Color");
             if (shader == null)
-                shader = Shader.Find("Unlit/Color");
+                return null;
 
             smokeMaterial = new Material(shader);
-            var color = new Color(0.34f, 0.36f, 0.38f, 0.78f);
-            if (smokeMaterial.HasProperty("_BaseColor"))
-                smokeMaterial.SetColor("_BaseColor", color);
-            else
-                smokeMaterial.color = color;
+            var color = new Color(0.34f, 0.36f, 0.38f, 0.64f);
 
+            smokeMaterial.SetOverrideTag("RenderType", "Transparent");
             if (smokeMaterial.HasProperty("_Surface"))
                 smokeMaterial.SetFloat("_Surface", 1f);
+            if (smokeMaterial.HasProperty("_SrcBlend"))
+                smokeMaterial.SetFloat("_SrcBlend", (float)BlendMode.SrcAlpha);
+            if (smokeMaterial.HasProperty("_DstBlend"))
+                smokeMaterial.SetFloat("_DstBlend", (float)BlendMode.OneMinusSrcAlpha);
             if (smokeMaterial.HasProperty("_ZWrite"))
                 smokeMaterial.SetFloat("_ZWrite", 0f);
-            smokeMaterial.renderQueue = 3000;
+            if (smokeMaterial.HasProperty("_BaseColor"))
+                smokeMaterial.SetColor("_BaseColor", color);
+            else if (smokeMaterial.HasProperty("_Color"))
+                smokeMaterial.SetColor("_Color", color);
+
+            smokeMaterial.EnableKeyword("_SURFACE_TYPE_TRANSPARENT");
+            smokeMaterial.renderQueue = (int)RenderQueue.Transparent;
             return smokeMaterial;
         }
     }
