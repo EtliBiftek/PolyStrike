@@ -203,7 +203,7 @@ namespace PolyStrike.Match
                 GrenadeType.HighExplosive => MatchRules.HePrice,
                 GrenadeType.Flashbang => MatchRules.FlashPrice,
                 GrenadeType.Smoke => MatchRules.SmokePrice,
-                GrenadeType.Molotov => MatchRules.MolotovPrice,
+                GrenadeType.Molotov => Team == MatchTeam.Terrorists ? MatchRules.MolotovPrice : MatchRules.IncendiaryPrice,
                 _ => int.MaxValue
             };
 
