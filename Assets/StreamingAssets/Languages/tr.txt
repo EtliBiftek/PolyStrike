@@ -1,0 +1,11 @@
+# PolyStrike - Türkçe
+# Yeni bir dil eklemek için bu dosyayı kopyalayıp örneğin en.txt olarak çevirmen yeterli.
+
+prototype.title=PolyStrike - İlk Oynanabilir Prototip
+prototype.controls=WASD: Hareket | Space: Zıpla | Ctrl/C: Çömel | Sol Tık: Ateş | R: Şarjör Değiştir | Esc: İmleci Bırak
+hud.health=Can: {0}
+hud.ammo=Mermi: {0} / {1}
+hud.reloading=Şarjör değiştiriliyor...
+menu.play=Oyna
+menu.settings=Ayarlar
+menu.exit=Çıkış
