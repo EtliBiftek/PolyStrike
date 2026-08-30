@@ -25,7 +25,7 @@ namespace PolyStrike.Gameplay
             grenadeType = type;
             transform.position = spawnPosition;
             velocitySourceUnits = launchVelocitySourceUnits;
-            spinDegreesPerSecond = new Vector3(610f, 390f, 470f);
+            spinDegreesPerSecond = new Vector3(600f, Random.Range(-1200f, 1200f), 0f);
             owner = thrower;
             nextSmokeThink = GrenadeRules.SmokeArmTime;
         }
@@ -35,7 +35,7 @@ namespace PolyStrike.Gameplay
             if (detonated)
                 return;
 
-            transform.Rotate(spinDegreesPerSecond * Time.deltaTime, Space.Self);
+            transform.Rotate(spinDegreesPerSecond * Time.deltaTime, Space.World);
 
             accumulator = Mathf.Min(accumulator + Time.deltaTime, MaxSimulationCatchup);
             while (accumulator >= Substep && !detonated)
@@ -80,10 +80,12 @@ namespace PolyStrike.Gameplay
             if (distance <= 0.00001f)
                 return false;
 
-            var hits = Physics.SphereCastAll(
+            var halfExtent = SourceUnit.ToMeters(GrenadeRules.ProjectileHalfExtent);
+            var hits = Physics.BoxCastAll(
                 transform.position,
-                SourceUnit.ToMeters(GrenadeRules.ProjectileRadius),
+                Vector3.one * halfExtent,
                 displacement / distance,
+                Quaternion.identity,
                 distance,
                 ~0,
                 QueryTriggerInteraction.Ignore);
@@ -143,6 +145,7 @@ namespace PolyStrike.Gameplay
             if (!hitPlayer && hit.normal.y > 0.1f && velocitySourceUnits.magnitude < GrenadeRules.RestSpeed)
             {
                 velocitySourceUnits = Vector3.zero;
+                spinDegreesPerSecond = Vector3.zero;
                 atRest = true;
             }
         }
