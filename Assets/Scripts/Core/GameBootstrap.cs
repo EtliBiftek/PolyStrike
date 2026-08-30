@@ -15,6 +15,7 @@ namespace PolyStrike.Core
                 return;
 
             CreateLighting();
+            GrenadeEffects.EnsureExists();
             CreateArena();
             CreatePlayer();
             CreateTargets();
@@ -95,6 +96,9 @@ namespace PolyStrike.Core
             look.SetCamera(cameraObject.transform);
             deathResponse.SetCamera(camera);
 
+            var flashEffect = player.AddComponent<FlashEffect>();
+            flashEffect.SetCamera(camera);
+
             var viewmodel = CreateViewmodel(cameraObject.transform, camera, out var muzzle);
             var feedback = cameraObject.AddComponent<CombatFeedback>();
             feedback.SetMuzzle(muzzle);
@@ -103,6 +107,9 @@ namespace PolyStrike.Core
             weapon.SetReferences(camera, look, movement, viewmodel);
             movement.SetHeldWeapon(weapon);
             deathResponse.SetWeapon(weapon);
+
+            var utility = player.AddComponent<UtilityController>();
+            utility.SetReferences(look, movement, weapon, viewmodel);
 
             player.AddComponent<DebugHud>();
         }
