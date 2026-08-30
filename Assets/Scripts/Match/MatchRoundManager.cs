@@ -17,7 +17,6 @@ namespace PolyStrike.Match
         private float phaseEndsAt;
         private float buyEndsAt;
         private bool bombWasPlantedThisRound;
-        private MatchParticipant planter;
 
         public RoundPhase Phase { get; private set; } = RoundPhase.FreezeTime;
         public int TerroristScore { get; private set; }
@@ -96,9 +95,8 @@ namespace PolyStrike.Match
                 return;
 
             bombWasPlantedThisRound = true;
-            planter = plantedBy;
-            planter.GiveBomb(false);
-            planter.AddMoney(MatchRules.BombPlantPlayerReward);
+            plantedBy.GiveBomb(false);
+            plantedBy.AddMoney(MatchRules.BombPlantPlayerReward);
 
             Phase = RoundPhase.PostPlant;
             phaseEndsAt = Time.time + MatchRules.BombTimer;
@@ -119,6 +117,7 @@ namespace PolyStrike.Match
             if (Phase != RoundPhase.PostPlant)
                 return;
 
+            C4Controller.ExplodePlantedBomb();
             EndRound(MatchTeam.Terrorists, RoundEndReason.BombExploded);
         }
 
@@ -160,7 +159,6 @@ namespace PolyStrike.Match
         private void StartFreezeTime()
         {
             bombWasPlantedThisRound = false;
-            planter = null;
             LastRoundEndReason = null;
             LastRoundWinner = null;
 
@@ -363,17 +361,17 @@ namespace PolyStrike.Match
 
         private static void ClearRoundWorldEffects()
         {
-            var grenades = FindObjectsByType<GrenadeProjectile>(FindObjectsSortMode.None);
+            var grenades = Object.FindObjectsByType<GrenadeProjectile>(FindObjectsSortMode.None);
             for (var i = 0; i < grenades.Length; i++)
-                Destroy(grenades[i].gameObject);
+                Object.Destroy(grenades[i].gameObject);
 
-            var smokes = FindObjectsByType<SmokeCloud>(FindObjectsSortMode.None);
+            var smokes = Object.FindObjectsByType<SmokeCloud>(FindObjectsSortMode.None);
             for (var i = 0; i < smokes.Length; i++)
-                Destroy(smokes[i].gameObject);
+                Object.Destroy(smokes[i].gameObject);
 
-            var infernos = FindObjectsByType<InfernoArea>(FindObjectsSortMode.None);
+            var infernos = Object.FindObjectsByType<InfernoArea>(FindObjectsSortMode.None);
             for (var i = 0; i < infernos.Length; i++)
-                Destroy(infernos[i].gameObject);
+                Object.Destroy(infernos[i].gameObject);
 
             C4Controller.ClearPlantedBomb();
         }
