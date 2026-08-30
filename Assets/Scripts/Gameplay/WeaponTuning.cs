@@ -14,7 +14,9 @@ namespace PolyStrike.Gameplay
         public float RoundsPerMinute { get; private set; }
         public int MagazineSize { get; private set; }
         public int ReserveAmmo { get; private set; }
-        public float ReloadTime { get; private set; }
+        public float ReloadClipReadyTime { get; private set; }
+        public float ReloadFireReadyTime { get; private set; }
+        public float DeployTime { get; private set; }
         public float MaxMoveSpeedSourceUnits { get; private set; }
         public float StandingInaccuracy { get; private set; }
         public float CrouchingInaccuracy { get; private set; }
@@ -43,7 +45,9 @@ namespace PolyStrike.Gameplay
                 RoundsPerMinute = 600f,
                 MagazineSize = 30,
                 ReserveAmmo = 90,
-                ReloadTime = 2.5f,
+                ReloadClipReadyTime = 1.17f,
+                ReloadFireReadyTime = 2.43f,
+                DeployTime = 1.00f,
                 MaxMoveSpeedSourceUnits = 215f,
                 StandingInaccuracy = 0.00641f,
                 CrouchingInaccuracy = 0.0048f,
@@ -82,7 +86,9 @@ namespace PolyStrike.Gameplay
                 RoundsPerMinute = 667f,
                 MagazineSize = 30,
                 ReserveAmmo = 90,
-                ReloadTime = 3.07f,
+                ReloadClipReadyTime = 1.37f,
+                ReloadFireReadyTime = 3.07f,
+                DeployTime = 1.13f,
                 MaxMoveSpeedSourceUnits = 225f,
                 StandingInaccuracy = 0.0049f,
                 CrouchingInaccuracy = 0.0041f,
