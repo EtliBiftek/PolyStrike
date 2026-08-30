@@ -8,7 +8,7 @@ namespace PolyStrike.Gameplay
     {
         private const int FlameCount = 16;
         private const float PeakSpreadTime = 1.83f;
-        private const float DamageTick = 0.10f;
+        private const float DamageTick = 0.20f;
 
         private static readonly List<InfernoArea> Active = new List<InfernoArea>();
         private static Material flameMaterial;
