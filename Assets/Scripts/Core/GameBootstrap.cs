@@ -1,4 +1,5 @@
 using PolyStrike.Gameplay;
+using PolyStrike.Match;
 using PolyStrike.Player;
 using UnityEngine;
 
@@ -19,6 +20,7 @@ namespace PolyStrike.Core
             CreateArena();
             CreatePlayer();
             CreateTargets();
+            CreateMatchManager();
         }
 
         private static void CreateLighting()
@@ -51,6 +53,9 @@ namespace PolyStrike.Core
             CreateBlock(new Vector3(-6f, 0.035f, -2f), new Vector3(3f, 0.07f, 3f), SurfaceMaterial.Metal, "Metal Yürüyüş Alanı");
             CreateBlock(new Vector3(-2.5f, 0.035f, -2f), new Vector3(3f, 0.07f, 3f), SurfaceMaterial.Wood, "Ahşap Yürüyüş Alanı");
             CreateBlock(new Vector3(2.5f, 0.035f, -2f), new Vector3(3f, 0.07f, 3f), SurfaceMaterial.Plastic, "Plastik Yürüyüş Alanı");
+
+            CreateBombSite("A", new Vector3(-8f, 0.06f, 9f));
+            CreateBombSite("B", new Vector3(8f, 0.06f, 9f));
         }
 
         private static void CreateBlock(Vector3 position, Vector3 scale, SurfaceMaterial material, string objectName = "Duvar")
@@ -60,6 +65,23 @@ namespace PolyStrike.Core
             block.transform.position = position;
             block.transform.localScale = scale;
             block.AddComponent<PenetrableSurface>().Configure(material);
+        }
+
+        private static void CreateBombSite(string id, Vector3 position)
+        {
+            var site = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            site.name = $"Bomb Site {id}";
+            site.transform.position = position;
+            site.transform.localScale = new Vector3(4.5f, 0.10f, 4.5f);
+
+            var renderer = site.GetComponent<Renderer>();
+            var material = renderer.material;
+            if (material.HasProperty("_BaseColor"))
+                material.SetColor("_BaseColor", id == "A" ? new Color(0.55f, 0.30f, 0.08f) : new Color(0.14f, 0.32f, 0.55f));
+            else
+                material.color = id == "A" ? new Color(0.55f, 0.30f, 0.08f) : new Color(0.14f, 0.32f, 0.55f);
+
+            site.AddComponent<BombSite>().Configure(id);
         }
 
         private static void CreatePlayer()
@@ -76,6 +98,9 @@ namespace PolyStrike.Core
 
             var health = player.AddComponent<Health>();
             health.SetDisableOnDeath(false);
+
+            var participant = player.AddComponent<MatchParticipant>();
+            participant.Configure(MatchTeam.Terrorists, true);
 
             var movement = player.AddComponent<PlayerMovement>();
             var look = player.AddComponent<PlayerLook>();
@@ -110,7 +135,11 @@ namespace PolyStrike.Core
 
             var utility = player.AddComponent<UtilityController>();
             utility.SetReferences(look, movement, weapon, viewmodel);
+            deathResponse.SetUtility(utility);
 
+            participant.SetLoadoutReferences(weapon, utility);
+            player.AddComponent<C4Controller>();
+            player.AddComponent<BuyMenu>();
             player.AddComponent<DebugHud>();
         }
 
@@ -187,8 +216,10 @@ namespace PolyStrike.Core
             root.transform.position = position;
 
             var health = root.AddComponent<Health>();
-            health.SetEquipment(100f, true);
             health.SetDisableOnDeath(false);
+
+            var participant = root.AddComponent<MatchParticipant>();
+            participant.Configure(MatchTeam.CounterTerrorists, false);
 
             var head = CreateHitboxPart(root.transform, health, HitGroup.Head, "Kafa", new Vector3(0f, 1.66f, 0f), new Vector3(0.30f, 0.30f, 0.30f), 3.5f);
             var chest = CreateHitboxPart(root.transform, health, HitGroup.Chest, "Göğüs", new Vector3(0f, 1.32f, 0f), new Vector3(0.56f, 0.42f, 0.28f), 18f);
@@ -245,6 +276,12 @@ namespace PolyStrike.Core
             joint.highTwistLimit = new SoftJointLimit { limit = twist };
             joint.swing1Limit = new SoftJointLimit { limit = swing };
             joint.swing2Limit = new SoftJointLimit { limit = swing };
+        }
+
+        private static void CreateMatchManager()
+        {
+            var match = new GameObject("Competitive Match");
+            match.AddComponent<MatchRoundManager>();
         }
     }
 }
