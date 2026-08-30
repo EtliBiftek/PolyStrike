@@ -183,7 +183,7 @@ namespace PolyStrike.Gameplay
                 return;
 
             detonated = true;
-            GrenadeEffects.Detonate(grenadeType, transform.position, owner);
+            GrenadeEffects.Detonate(grenadeType, transform.position);
             Destroy(gameObject);
         }
 
