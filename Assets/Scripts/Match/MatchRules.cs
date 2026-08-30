@@ -32,9 +32,9 @@ namespace PolyStrike.Match
 
         public const float FreezeTime = 15f;
         public const float BuyTime = 20f;
-        public const float RoundTime = 115f;
-        public const float RoundRestartDelay = 5f;
-        public const float HalfTimeDuration = 8f;
+        public const float RoundTime = 115.2f;
+        public const float RoundRestartDelay = 7f;
+        public const float HalfTimeDuration = 15f;
 
         public const float BombTimer = 40f;
         public const float PlantTime = 3.2f;
