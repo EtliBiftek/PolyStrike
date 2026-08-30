@@ -10,6 +10,7 @@ namespace PolyStrike.Match
     {
         private const float DefuseUseDistance = 2.0f;
         private const float DefuseLookDot = 0.52f;
+        private const float BombMoveSpeed = 250f;
 
         private static GameObject plantedBomb;
 
@@ -17,17 +18,20 @@ namespace PolyStrike.Match
         private PlayerMovement movement;
         private HitscanWeapon weapon;
         private UtilityController utility;
+        private ViewmodelMotion viewmodel;
         private Camera playerCamera;
 
         private float interactionStartedAt;
         private float interactionDuration;
         private bool planting;
         private bool defusing;
+        private bool bombEquipped;
 
         public static Transform PlantedBombTransform => plantedBomb != null ? plantedBomb.transform : null;
         public bool IsInteracting => planting || defusing;
         public bool IsPlanting => planting;
         public bool IsDefusing => defusing;
+        public bool IsBombEquipped => bombEquipped;
         public float InteractionProgress => IsInteracting && interactionDuration > 0f
             ? Mathf.Clamp01((Time.time - interactionStartedAt) / interactionDuration)
             : 0f;
@@ -38,7 +42,15 @@ namespace PolyStrike.Match
             movement = GetComponent<PlayerMovement>();
             utility = GetComponent<UtilityController>();
             weapon = GetComponentInChildren<HitscanWeapon>();
+            viewmodel = GetComponentInChildren<ViewmodelMotion>(true);
             playerCamera = Camera.main;
+            participant.Died += OnParticipantDied;
+        }
+
+        private void OnDestroy()
+        {
+            if (participant != null)
+                participant.Died -= OnParticipantDied;
         }
 
         private void Update()
@@ -47,18 +59,66 @@ namespace PolyStrike.Match
             if (match == null || participant.Health == null || participant.Health.IsDead)
             {
                 CancelInteraction();
+                HolsterBomb();
                 return;
             }
 
-            if (!GameInput.UseHeld)
+            if (participant.Team == MatchTeam.Terrorists)
+                UpdateTerroristBomb(match);
+            else
+                UpdateCounterTerroristDefuse(match);
+        }
+
+        private void UpdateTerroristBomb(MatchRoundManager match)
+        {
+            var canHandleBomb = participant.CarriesBomb &&
+                                (match.Phase == RoundPhase.FreezeTime || match.Phase == RoundPhase.Live);
+
+            if (GameInput.BombPressed && canHandleBomb)
+                EquipBomb();
+
+            if (bombEquipped && (GameInput.Weapon1Pressed || GameInput.Weapon2Pressed || GameInput.UtilityPressed ||
+                                 GameInput.HeGrenadePressed || GameInput.FlashbangPressed || GameInput.SmokePressed ||
+                                 GameInput.MolotovPressed))
+            {
+                CancelInteraction();
+                HolsterBomb();
+                return;
+            }
+
+            if (bombEquipped && GameInput.DropPressed && canHandleBomb)
+            {
+                DropCarriedBomb(true);
+                return;
+            }
+
+            if (match.Phase != RoundPhase.Live || !participant.CarriesBomb)
             {
                 CancelInteraction();
                 return;
             }
 
-            if (participant.Team == MatchTeam.Terrorists && match.Phase == RoundPhase.Live)
-                UpdatePlant(match);
-            else if (participant.Team == MatchTeam.CounterTerrorists && match.Phase == RoundPhase.PostPlant)
+            var inSite = BombSite.FindAt(transform.position) != null;
+            var wantsPlant = inSite && (GameInput.UseHeld || (bombEquipped && GameInput.FireHeld));
+
+            if (!wantsPlant)
+            {
+                CancelInteraction();
+                return;
+            }
+
+            if (!bombEquipped)
+                EquipBomb();
+
+            UpdatePlant(match);
+        }
+
+        private void UpdateCounterTerroristDefuse(MatchRoundManager match)
+        {
+            if (bombEquipped)
+                HolsterBomb();
+
+            if (match.Phase == RoundPhase.PostPlant && GameInput.UseHeld)
                 UpdateDefuse(match);
             else
                 CancelInteraction();
@@ -66,14 +126,8 @@ namespace PolyStrike.Match
 
         private void UpdatePlant(MatchRoundManager match)
         {
-            if (!participant.CarriesBomb)
-            {
-                CancelInteraction();
-                return;
-            }
-
             var site = BombSite.FindAt(transform.position);
-            if (site == null)
+            if (site == null || !participant.CarriesBomb)
             {
                 CancelInteraction();
                 return;
@@ -88,7 +142,9 @@ namespace PolyStrike.Match
             var position = transform.position;
             position.y = Mathf.Max(site.PlantPosition.y + 0.05f, 0.05f);
             SpawnPlantedBomb(position);
+            participant.GiveBomb(false);
             FinishInteraction();
+            HolsterBomb();
             match.RegisterBombPlanted(participant);
         }
 
@@ -112,6 +168,28 @@ namespace PolyStrike.Match
             ClearPlantedBomb();
         }
 
+        public bool DropCarriedBomb(bool throwForward)
+        {
+            if (!participant.CarriesBomb || plantedBomb != null)
+                return false;
+
+            CancelInteraction();
+            participant.GiveBomb(false);
+
+            var origin = transform.position + Vector3.up * 0.85f + transform.forward * 0.35f;
+            var inherited = movement != null ? SourceUnit.ToSourceUnits(movement.WorldVelocity) : Vector3.zero;
+            var toss = inherited;
+
+            if (throwForward)
+                toss += transform.forward * 220f + Vector3.up * 80f;
+            else
+                toss += Vector3.up * 45f;
+
+            DroppedMatchItem.SpawnBomb(origin, SourceUnit.ToMeters(toss));
+            HolsterBomb();
+            return true;
+        }
+
         private bool CanUsePlantedBomb()
         {
             if (plantedBomb == null)
@@ -131,6 +209,35 @@ namespace PolyStrike.Match
                 return true;
 
             return hit.transform == plantedBomb.transform || hit.transform.IsChildOf(plantedBomb.transform);
+        }
+
+        private void EquipBomb()
+        {
+            if (bombEquipped || !participant.CarriesBomb)
+                return;
+
+            bombEquipped = true;
+            utility?.SetExternalInputBlocked(true);
+            weapon?.SetExternalInputBlocked(true);
+            movement?.SetExternalMaxSpeed(BombMoveSpeed);
+            viewmodel?.SetBombMode(true);
+            viewmodel?.PlayDeploy(0.45f);
+        }
+
+        private void HolsterBomb()
+        {
+            if (!bombEquipped)
+                return;
+
+            bombEquipped = false;
+            viewmodel?.SetBombMode(false);
+            movement?.ClearExternalMaxSpeed();
+
+            var match = MatchRoundManager.Instance;
+            var roundLocked = match != null && (match.Phase == RoundPhase.FreezeTime || match.Phase == RoundPhase.RoundEnd ||
+                                                 match.Phase == RoundPhase.HalfTime || match.Phase == RoundPhase.MatchEnd);
+            weapon?.SetExternalInputBlocked(roundLocked || (utility != null && utility.IsEquipped));
+            utility?.SetExternalInputBlocked(roundLocked);
         }
 
         private void BeginInteraction(bool isPlant, float duration)
@@ -161,8 +268,14 @@ namespace PolyStrike.Match
             var phase = MatchRoundManager.Instance != null ? MatchRoundManager.Instance.Phase : RoundPhase.Live;
             var roundLocked = phase == RoundPhase.FreezeTime || phase == RoundPhase.RoundEnd || phase == RoundPhase.HalfTime || phase == RoundPhase.MatchEnd;
             movement?.SetRoundMovementLocked(roundLocked);
-            weapon?.SetExternalInputBlocked(roundLocked);
-            utility?.SetExternalInputBlocked(roundLocked);
+            weapon?.SetExternalInputBlocked(roundLocked || bombEquipped);
+            utility?.SetExternalInputBlocked(roundLocked || bombEquipped);
+        }
+
+        private void OnParticipantDied(MatchParticipant deadParticipant)
+        {
+            if (deadParticipant == participant && participant.CarriesBomb)
+                DropCarriedBomb(false);
         }
 
         private static void SpawnPlantedBomb(Vector3 position)
