@@ -4,6 +4,7 @@ namespace PolyStrike.Gameplay
 {
     public sealed class HitReaction : MonoBehaviour
     {
+        private Rigidbody body;
         private Vector3 rotationOffset;
         private Vector3 positionOffset;
         private Quaternion baseRotation;
@@ -11,6 +12,7 @@ namespace PolyStrike.Gameplay
 
         private void Awake()
         {
+            body = GetComponent<Rigidbody>();
             baseRotation = transform.localRotation;
             basePosition = transform.localPosition;
         }
@@ -33,6 +35,12 @@ namespace PolyStrike.Gameplay
 
         private void LateUpdate()
         {
+            if (body != null && !body.isKinematic)
+            {
+                enabled = false;
+                return;
+            }
+
             rotationOffset = Vector3.Lerp(rotationOffset, Vector3.zero, 1f - Mathf.Exp(-18f * Time.deltaTime));
             positionOffset = Vector3.Lerp(positionOffset, Vector3.zero, 1f - Mathf.Exp(-22f * Time.deltaTime));
 
