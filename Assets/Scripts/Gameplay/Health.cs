@@ -7,6 +7,7 @@ namespace PolyStrike.Gameplay
     public sealed class Health : MonoBehaviour
     {
         private const float ArmorBonus = 0.5f;
+        private const float HeArmorRatio = 0.575f;
 
         [SerializeField] private float maxHealth = 100f;
         [SerializeField] private float startingArmor = 100f;
@@ -45,48 +46,43 @@ namespace PolyStrike.Gameplay
             LastHitGroup = bullet.HitGroup;
 
             var scaledDamage = bullet.Damage * HitGroupRules.GetDamageMultiplier(bullet.HitGroup);
-            var healthDamage = scaledDamage;
-            var armorDamage = 0f;
             var armorProtected = Armor > 0f && HitGroupRules.IsProtectedByArmor(bullet.HitGroup, hasHelmet);
+            var result = ApplyArmoredDamage(scaledDamage, bullet.ArmorPenetration, armorProtected);
 
-            if (armorProtected)
+            if (result.HealthDamage > 0)
             {
-                var armorPenetration = Mathf.Clamp01(bullet.ArmorPenetration);
-                healthDamage = scaledDamage * armorPenetration;
-                armorDamage = (scaledDamage - healthDamage) * ArmorBonus;
-
-                if (armorDamage > Armor)
-                {
-                    armorDamage = Armor;
-                    healthDamage = scaledDamage - armorDamage / ArmorBonus;
-                }
-            }
-
-            var dealt = Mathf.Max(0, Mathf.FloorToInt(healthDamage));
-            var armorSpent = Mathf.Max(0, Mathf.FloorToInt(armorDamage));
-
-            Current = Mathf.Max(0f, Current - dealt);
-            Armor = Mathf.Max(0f, Armor - armorSpent);
-
-            Changed?.Invoke(Current, maxHealth);
-            if (armorSpent > 0)
-                ArmorChanged?.Invoke(Armor);
-
-            if (dealt > 0)
-            {
-                if (movement == null)
-                    movement = GetComponent<PlayerMovement>();
-                if (playerLook == null)
-                    playerLook = GetComponent<PlayerLook>();
-
+                ResolvePlayerReferences();
                 movement?.ApplyTag(bullet.TaggingBaseVsM4);
-                playerLook?.ApplyExternalAimPunch(dealt, bullet.HitGroup, armorProtected, bullet.Direction);
+                playerLook?.ApplyExternalAimPunch(result.HealthDamage, bullet.HitGroup, armorProtected, bullet.Direction);
             }
 
             if (Current <= 0f)
                 Die();
 
-            return new BulletDamageResult(dealt, armorSpent, IsDead);
+            return new BulletDamageResult(result.HealthDamage, result.ArmorDamage, IsDead);
+        }
+
+        public int TakeGrenadeDamage(float rawDamage, Vector3 blastDirection)
+        {
+            if (IsDead || rawDamage <= 0f)
+                return 0;
+
+            LastBulletDirection = blastDirection;
+            LastHitGroup = HitGroup.Chest;
+
+            var armorProtected = Armor > 0f;
+            var result = ApplyArmoredDamage(rawDamage, HeArmorRatio, armorProtected);
+
+            if (result.HealthDamage > 0)
+            {
+                ResolvePlayerReferences();
+                playerLook?.ApplyExternalAimPunch(result.HealthDamage, HitGroup.Chest, armorProtected, blastDirection);
+            }
+
+            if (Current <= 0f)
+                Die();
+
+            return result.HealthDamage;
         }
 
         public void TakeDamage(float amount)
@@ -120,6 +116,44 @@ namespace PolyStrike.Gameplay
         public void SetDisableOnDeath(bool value)
         {
             disableOnDeath = value;
+        }
+
+        private (int HealthDamage, int ArmorDamage) ApplyArmoredDamage(float rawDamage, float armorRatio, bool armorProtected)
+        {
+            var healthDamage = rawDamage;
+            var armorDamage = 0f;
+
+            if (armorProtected)
+            {
+                healthDamage = rawDamage * Mathf.Clamp01(armorRatio);
+                armorDamage = (rawDamage - healthDamage) * ArmorBonus;
+
+                if (armorDamage > Armor)
+                {
+                    armorDamage = Armor;
+                    healthDamage = rawDamage - armorDamage / ArmorBonus;
+                }
+            }
+
+            var dealt = Mathf.Max(0, Mathf.FloorToInt(healthDamage));
+            var armorSpent = Mathf.Max(0, Mathf.FloorToInt(armorDamage));
+
+            Current = Mathf.Max(0f, Current - dealt);
+            Armor = Mathf.Max(0f, Armor - armorSpent);
+
+            Changed?.Invoke(Current, maxHealth);
+            if (armorSpent > 0)
+                ArmorChanged?.Invoke(Armor);
+
+            return (dealt, armorSpent);
+        }
+
+        private void ResolvePlayerReferences()
+        {
+            if (movement == null)
+                movement = GetComponent<PlayerMovement>();
+            if (playerLook == null)
+                playerLook = GetComponent<PlayerLook>();
         }
 
         private void Die()
