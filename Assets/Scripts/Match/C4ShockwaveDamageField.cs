@@ -27,7 +27,7 @@ namespace PolyStrike.Match
 
                 var target = health.transform.position;
                 var pathDistance = EstimatePropagationDistance(origin, target);
-                if (!float.IsFinite(pathDistance) || pathDistance >= MaximumRange)
+                if (float.IsNaN(pathDistance) || float.IsInfinity(pathDistance) || pathDistance >= MaximumRange)
                     continue;
 
                 var normalized = Mathf.Clamp01(pathDistance / MaximumRange);
