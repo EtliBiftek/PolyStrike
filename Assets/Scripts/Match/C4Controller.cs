@@ -12,7 +12,6 @@ namespace PolyStrike.Match
         private const float DefuseLookDot = 0.52f;
 
         private static GameObject plantedBomb;
-        private static BombSite plantedSite;
 
         private MatchParticipant participant;
         private PlayerMovement movement;
@@ -88,7 +87,7 @@ namespace PolyStrike.Match
 
             var position = transform.position;
             position.y = Mathf.Max(site.PlantPosition.y + 0.05f, 0.05f);
-            SpawnPlantedBomb(position, site);
+            SpawnPlantedBomb(position);
             FinishInteraction();
             match.RegisterBombPlanted(participant);
         }
@@ -148,10 +147,8 @@ namespace PolyStrike.Match
 
         private void CancelInteraction()
         {
-            if (!IsInteracting)
-                return;
-
-            FinishInteraction();
+            if (IsInteracting)
+                FinishInteraction();
         }
 
         private void FinishInteraction()
@@ -168,7 +165,7 @@ namespace PolyStrike.Match
             utility?.SetExternalInputBlocked(roundLocked);
         }
 
-        private static void SpawnPlantedBomb(Vector3 position, BombSite site)
+        private static void SpawnPlantedBomb(Vector3 position)
         {
             ClearPlantedBomb();
 
@@ -176,7 +173,6 @@ namespace PolyStrike.Match
             plantedBomb.name = "Planted C4";
             plantedBomb.transform.position = position;
             plantedBomb.transform.localScale = new Vector3(0.28f, 0.12f, 0.20f);
-            plantedSite = site;
 
             var renderer = plantedBomb.GetComponent<Renderer>();
             var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
@@ -191,65 +187,23 @@ namespace PolyStrike.Match
             plantedBomb.AddComponent<C4Beep>();
         }
 
+        public static void ExplodePlantedBomb()
+        {
+            if (plantedBomb == null)
+                return;
+
+            var position = plantedBomb.transform.position;
+            C4ExplosionPresentation.Play(position);
+            Object.Destroy(plantedBomb);
+            plantedBomb = null;
+        }
+
         public static void ClearPlantedBomb()
         {
             if (plantedBomb != null)
-                Destroy(plantedBomb);
+                Object.Destroy(plantedBomb);
 
             plantedBomb = null;
-            plantedSite = null;
-        }
-
-        private sealed class C4Beep : MonoBehaviour
-        {
-            private AudioSource source;
-            private AudioClip beep;
-            private float nextBeep;
-
-            private void Awake()
-            {
-                source = gameObject.AddComponent<AudioSource>();
-                source.spatialBlend = 1f;
-                source.minDistance = 1.5f;
-                source.maxDistance = 28f;
-                source.rolloffMode = AudioRolloffMode.Logarithmic;
-                source.dopplerLevel = 0f;
-                beep = BuildBeep();
-            }
-
-            private void Update()
-            {
-                var match = MatchRoundManager.Instance;
-                if (match == null || match.Phase != RoundPhase.PostPlant)
-                    return;
-
-                if (Time.time < nextBeep)
-                    return;
-
-                var remaining = match.TimeRemaining;
-                var interval = Mathf.Lerp(0.16f, 0.95f, Mathf.Clamp01(remaining / MatchRules.BombTimer));
-                source.PlayOneShot(beep, 0.72f);
-                nextBeep = Time.time + interval;
-            }
-
-            private static AudioClip BuildBeep()
-            {
-                const int sampleRate = 44100;
-                const float duration = 0.065f;
-                var count = Mathf.CeilToInt(sampleRate * duration);
-                var data = new float[count];
-
-                for (var i = 0; i < count; i++)
-                {
-                    var t = i / (float)sampleRate;
-                    var envelope = Mathf.Exp(-t * 42f);
-                    data[i] = Mathf.Sin(t * Mathf.PI * 2f * 1420f) * envelope * 0.34f;
-                }
-
-                var clip = AudioClip.Create("C4 Beep", count, 1, sampleRate, false);
-                clip.SetData(data, 0);
-                return clip;
-            }
         }
     }
 }
