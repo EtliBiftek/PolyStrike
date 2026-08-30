@@ -16,7 +16,7 @@ namespace PolyStrike.Gameplay
         public const float FullThrowSpeed = 675f;
         public const float Gravity = 320f;
         public const float BounceScale = 0.45f;
-        public const float ProjectileRadius = 2f;
+        public const float ProjectileHalfExtent = 2f;
         public const float RestSpeed = 20f;
         public const float ThrowConstructionDelay = 0.10f;
         public const float PlayerVelocityInheritance = 1.25f;
