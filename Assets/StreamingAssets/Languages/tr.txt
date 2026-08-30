@@ -69,6 +69,7 @@ buy.incendiary=Yangın Bombası
 buy.item_price={0}  -  ${1}
 buy.item_count_price={0} x{1}  -  ${2}
 buy.item_owned={0}  -  ALINDI
+buy.refund=Son uygun satın alımı geri al  +${0}
 buy.close_hint=B veya Esc ile kapat
 
 menu.play=Oyna
