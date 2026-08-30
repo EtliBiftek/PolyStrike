@@ -35,9 +35,13 @@ namespace PolyStrike.Player
 
         private void Update()
         {
+            // Release sonrası CS2 atışı tamamlar; bu kısa pencerede weapon switch throw'u iptal etmez.
+            if (throwPending)
+                return;
+
             HandleSelection();
 
-            if (!utilityEquipped || throwPending || Cursor.lockState != CursorLockMode.Locked)
+            if (!utilityEquipped || Cursor.lockState != CursorLockMode.Locked)
                 return;
 
             UpdatePriming();
@@ -83,36 +87,27 @@ namespace PolyStrike.Player
             if (!GameInput.FireReleased && !GameInput.SecondaryFireReleased)
                 return;
 
-            var releasedStrength = armedStrength;
+            var type = selectedType;
+            var strength = armedStrength;
             primed = false;
-            StartCoroutine(ThrowAfterConstructionDelay(releasedStrength));
+            StartCoroutine(ThrowAfterConstructionDelay(type, strength));
         }
 
-        private IEnumerator ThrowAfterConstructionDelay(float strength)
+        private IEnumerator ThrowAfterConstructionDelay(GrenadeType type, float strength)
         {
             throwPending = true;
-
             var launch = CaptureLaunch(strength);
             yield return new WaitForSeconds(GrenadeRules.ThrowConstructionDelay);
 
-            if (!utilityEquipped || inventory[(int)selectedType] <= 0)
+            if (!utilityEquipped || inventory[(int)type] <= 0)
             {
                 throwPending = false;
                 yield break;
             }
 
-            SpawnProjectile(selectedType, launch.Position, launch.VelocitySourceUnits);
-            inventory[(int)selectedType]--;
-            throwPending = false;
-
-            if (inventory[(int)selectedType] > 0)
-            {
-                viewmodel?.PlayDeploy(0.72f);
-            }
-            else if (!TryEquipNextAvailable())
-            {
-                UnequipUtility();
-            }
+            SpawnProjectile(type, launch.Position, launch.VelocitySourceUnits);
+            inventory[(int)type]--;
+            CompleteThrow();
         }
 
         private LaunchState CaptureLaunch(float strength)
@@ -204,13 +199,19 @@ namespace PolyStrike.Player
             if (!utilityEquipped)
                 return;
 
+            StopAllCoroutines();
+            CompleteThrow();
+        }
+
+        private void CompleteThrow()
+        {
             utilityEquipped = false;
             primed = false;
             throwPending = false;
-            StopAllCoroutines();
             weapon?.SetExternalInputBlocked(false);
             movement?.ClearExternalMaxSpeed();
             viewmodel?.SetUtilityMode(false);
+            viewmodel?.PlayDeploy(0.35f);
         }
 
         private void CycleUtility()
@@ -225,21 +226,6 @@ namespace PolyStrike.Player
                 Equip((GrenadeType)index);
                 return;
             }
-        }
-
-        private bool TryEquipNextAvailable()
-        {
-            for (var offset = 1; offset <= inventory.Length; offset++)
-            {
-                var index = ((int)selectedType + offset) % inventory.Length;
-                if (inventory[index] <= 0)
-                    continue;
-
-                Equip((GrenadeType)index);
-                return true;
-            }
-
-            return false;
         }
 
         private static float GetStrength(bool primary, bool secondary)
