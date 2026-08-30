@@ -14,12 +14,15 @@ namespace PolyStrike.Gameplay
         [SerializeField] private bool disableOnDeath = true;
 
         private PlayerMovement movement;
+        private PlayerLook playerLook;
 
         public float Current { get; private set; }
         public float Max => maxHealth;
         public float Armor { get; private set; }
         public bool HasHelmet => hasHelmet;
         public bool IsDead { get; private set; }
+        public Vector3 LastBulletDirection { get; private set; }
+        public HitGroup LastHitGroup { get; private set; } = HitGroup.Chest;
 
         public event Action<float, float> Changed;
         public event Action<float> ArmorChanged;
@@ -30,6 +33,7 @@ namespace PolyStrike.Gameplay
             Current = maxHealth;
             Armor = Mathf.Clamp(startingArmor, 0f, 100f);
             movement = GetComponent<PlayerMovement>();
+            playerLook = GetComponent<PlayerLook>();
         }
 
         public BulletDamageResult TakeBulletDamage(BulletDamage bullet)
@@ -37,11 +41,15 @@ namespace PolyStrike.Gameplay
             if (IsDead || bullet.Damage <= 0f)
                 return new BulletDamageResult(0, 0, IsDead);
 
+            LastBulletDirection = bullet.Direction;
+            LastHitGroup = bullet.HitGroup;
+
             var scaledDamage = bullet.Damage * HitGroupRules.GetDamageMultiplier(bullet.HitGroup);
             var healthDamage = scaledDamage;
             var armorDamage = 0f;
+            var armorProtected = Armor > 0f && HitGroupRules.IsProtectedByArmor(bullet.HitGroup, hasHelmet);
 
-            if (Armor > 0f && HitGroupRules.IsProtectedByArmor(bullet.HitGroup, hasHelmet))
+            if (armorProtected)
             {
                 var armorPenetration = Mathf.Clamp01(bullet.ArmorPenetration);
                 healthDamage = scaledDamage * armorPenetration;
@@ -68,8 +76,11 @@ namespace PolyStrike.Gameplay
             {
                 if (movement == null)
                     movement = GetComponent<PlayerMovement>();
+                if (playerLook == null)
+                    playerLook = GetComponent<PlayerLook>();
 
                 movement?.ApplyTag(bullet.TaggingBaseVsM4);
+                playerLook?.ApplyExternalAimPunch(dealt, bullet.HitGroup, armorProtected, bullet.Direction);
             }
 
             if (Current <= 0f)
@@ -104,6 +115,11 @@ namespace PolyStrike.Gameplay
             Armor = Mathf.Clamp(armor, 0f, 100f);
             hasHelmet = helmet;
             ArmorChanged?.Invoke(Armor);
+        }
+
+        public void SetDisableOnDeath(bool value)
+        {
+            disableOnDeath = value;
         }
 
         private void Die()
