@@ -93,7 +93,10 @@ namespace PolyStrike.Match
             DrawGrenadeButton(GrenadeType.HighExplosive, "buy.he", MatchRules.HePrice);
             DrawGrenadeButton(GrenadeType.Flashbang, "buy.flash", MatchRules.FlashPrice);
             DrawGrenadeButton(GrenadeType.Smoke, "buy.smoke", MatchRules.SmokePrice);
-            DrawGrenadeButton(GrenadeType.Molotov, "buy.molotov", MatchRules.MolotovPrice);
+
+            var fireKey = participant.Team == MatchTeam.Terrorists ? "buy.molotov" : "buy.incendiary";
+            var firePrice = participant.Team == MatchTeam.Terrorists ? MatchRules.MolotovPrice : MatchRules.IncendiaryPrice;
+            DrawGrenadeButton(GrenadeType.Molotov, fireKey, firePrice);
 
             GUILayout.FlexibleSpace();
             GUILayout.Label(Localization.Get("buy.close_hint"));
