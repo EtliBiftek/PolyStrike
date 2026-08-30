@@ -1,4 +1,5 @@
 using PolyStrike.Core;
+using PolyStrike.Gameplay;
 using UnityEngine;
 
 namespace PolyStrike.Player
@@ -15,10 +16,16 @@ namespace PolyStrike.Player
 
         private PlayerMovement movement;
         private Vector2 cameraRecoil;
+        private Vector2 externalAimPunch;
+        private Vector2 aimPunchVelocity;
         private float lastRecoilTime = -10f;
         private float pitch;
 
-        public Quaternion AimRotation => Quaternion.Euler(pitch, transform.eulerAngles.y, 0f);
+        public Quaternion AimRotation => Quaternion.Euler(
+            pitch - externalAimPunch.y,
+            transform.eulerAngles.y + externalAimPunch.x,
+            0f);
+
         public Vector3 AimOrigin => cameraTransform != null ? cameraTransform.position : transform.position;
 
         public void SetCamera(Transform targetCamera)
@@ -30,6 +37,35 @@ namespace PolyStrike.Player
         {
             cameraRecoil += recoilDelta;
             lastRecoilTime = Time.time;
+        }
+
+        public void ApplyExternalAimPunch(int healthDamage, HitGroup hitGroup, bool armorProtected, Vector3 bulletDirection)
+        {
+            if (healthDamage <= 0)
+                return;
+
+            var groupScale = hitGroup switch
+            {
+                HitGroup.Head => 1.35f,
+                HitGroup.LeftLeg => 0.65f,
+                HitGroup.RightLeg => 0.65f,
+                _ => 1f
+            };
+
+            var armorScale = armorProtected ? 0.38f : 1f;
+            var magnitude = Mathf.Min(healthDamage * 0.075f * groupScale * armorScale, 12f);
+
+            var incoming = bulletDirection.sqrMagnitude > 0.0001f
+                ? transform.InverseTransformDirection(-bulletDirection.normalized)
+                : Vector3.forward;
+
+            var side = Mathf.Abs(incoming.x) > 0.03f ? Mathf.Sign(incoming.x) : (Random.value < 0.5f ? -1f : 1f);
+            var yawKick = magnitude * 0.22f * side;
+            var pitchKick = magnitude * (hitGroup == HitGroup.Head ? 1f : 0.68f);
+
+            externalAimPunch += new Vector2(yawKick, pitchKick);
+            externalAimPunch = Vector2.ClampMagnitude(externalAimPunch, 90f);
+            aimPunchVelocity += new Vector2(yawKick, pitchKick) * 3.5f;
         }
 
         private void Awake()
@@ -69,9 +105,11 @@ namespace PolyStrike.Player
             if (Time.time - lastRecoilTime >= recoilReturnDelay)
                 cameraRecoil = Vector2.MoveTowards(cameraRecoil, Vector2.zero, recoilReturnSpeed * Time.deltaTime);
 
+            UpdateAimPunch();
+
             cameraTransform.localRotation = Quaternion.Euler(
-                pitch - cameraRecoil.y,
-                cameraRecoil.x,
+                pitch - cameraRecoil.y - externalAimPunch.y,
+                cameraRecoil.x + externalAimPunch.x,
                 0f);
 
             if (movement != null)
@@ -81,6 +119,22 @@ namespace PolyStrike.Player
                 position.y = Mathf.MoveTowards(position.y, targetHeight, eyeTransitionSpeed * Time.deltaTime);
                 cameraTransform.localPosition = position;
             }
+        }
+
+        private void UpdateAimPunch()
+        {
+            if (externalAimPunch.sqrMagnitude < 0.00001f && aimPunchVelocity.sqrMagnitude < 0.00001f)
+            {
+                externalAimPunch = Vector2.zero;
+                aimPunchVelocity = Vector2.zero;
+                return;
+            }
+
+            var deltaTime = Time.deltaTime;
+            aimPunchVelocity += -externalAimPunch * (42f * deltaTime);
+            aimPunchVelocity *= Mathf.Exp(-11f * deltaTime);
+            externalAimPunch += aimPunchVelocity * deltaTime;
+            externalAimPunch = Vector2.ClampMagnitude(externalAimPunch, 90f);
         }
 
         private static void LockCursor()
