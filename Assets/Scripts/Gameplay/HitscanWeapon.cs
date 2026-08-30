@@ -16,6 +16,7 @@ namespace PolyStrike.Gameplay
         private PlayerLook playerLook;
         private PlayerMovement movement;
         private ViewmodelMotion viewmodel;
+        private CombatFeedback feedback;
         private WeaponTuning[] profiles;
         private int[] magazineAmmo;
         private int[] reserveAmmo;
@@ -48,6 +49,7 @@ namespace PolyStrike.Gameplay
 
         private void Awake()
         {
+            feedback = GetComponent<CombatFeedback>();
             profiles = new[]
             {
                 WeaponTuning.CreateTRifle(),
@@ -69,6 +71,7 @@ namespace PolyStrike.Gameplay
             deployUntil = Time.time + Profile.DeployTime;
             nextShotTime = deployUntil;
             viewmodel?.PlayDeploy(Profile.DeployTime);
+            feedback?.PlayDeploy(activeProfileIndex);
         }
 
         private void Update()
@@ -116,6 +119,8 @@ namespace PolyStrike.Gameplay
 
             playerLook?.AddCameraRecoil(recoilStep * 0.68f);
             viewmodel?.PlayShot(recoilStep);
+            feedback?.PlayWeaponShot(activeProfileIndex);
+            feedback?.PlayMuzzleFlash();
 
             CurrentInaccuracy = CalculateCurrentInaccuracy();
             var direction = BuildShotDirection(recoilPoint, CurrentInaccuracy);
@@ -133,12 +138,18 @@ namespace PolyStrike.Gameplay
             var remainingRange = Profile.RangeMeters;
             var traceOrigin = origin;
             var penetrationsLeft = MaxPenetrations;
+            var tracerEnd = origin + direction * Profile.RangeMeters;
 
             while (currentDamage >= 1f && remainingRange > 0f)
             {
                 if (!Physics.Raycast(traceOrigin, direction, out var hit, remainingRange, hitMask, QueryTriggerInteraction.Ignore))
+                {
+                    tracerEnd = traceOrigin + direction * remainingRange;
+                    feedback?.PlayTracer(tracerEnd);
                     return;
+                }
 
+                tracerEnd = hit.point;
                 var airDistanceUnits = SourceUnit.ToSourceUnits(hit.distance);
                 currentDamage *= Mathf.Pow(Profile.RangeModifier, airDistanceUnits / 500f);
                 remainingRange -= hit.distance;
@@ -152,6 +163,9 @@ namespace PolyStrike.Gameplay
                         Profile.TaggingBaseVsM4,
                         hitbox.HitGroup,
                         direction));
+
+                    feedback?.PlayPlayerImpact(hit.point, hit.normal, hitbox.HitGroup, result.HealthDamage);
+                    feedback?.PlayTracer(tracerEnd);
 
                     if (!result.Killed)
                         hit.collider.GetComponent<HitReaction>()?.React(direction, result.HealthDamage);
@@ -168,23 +182,37 @@ namespace PolyStrike.Gameplay
                         HitGroup.Chest,
                         direction));
 
+                    feedback?.PlayPlayerImpact(hit.point, hit.normal, HitGroup.Chest, result.HealthDamage);
+                    feedback?.PlayTracer(tracerEnd);
+
                     if (!result.Killed)
                         hit.collider.GetComponent<HitReaction>()?.React(direction, result.HealthDamage);
                     return;
                 }
 
-                if (penetrationsLeft <= 0)
-                    return;
-
                 var surface = hit.collider.GetComponent<PenetrableSurface>();
                 if (surface == null)
                     surface = hit.collider.GetComponentInParent<PenetrableSurface>();
 
-                if (surface == null || !TryPenetrate(hit, surface, direction, ref traceOrigin, ref remainingRange, ref currentDamage))
+                var material = surface != null ? surface.Material : SurfaceMaterial.Concrete;
+                feedback?.PlaySurfaceImpact(hit, material);
+
+                if (penetrationsLeft <= 0 || surface == null)
+                {
+                    feedback?.PlayTracer(tracerEnd);
                     return;
+                }
+
+                if (!TryPenetrate(hit, surface, direction, ref traceOrigin, ref remainingRange, ref currentDamage))
+                {
+                    feedback?.PlayTracer(tracerEnd);
+                    return;
+                }
 
                 penetrationsLeft--;
             }
+
+            feedback?.PlayTracer(tracerEnd);
         }
 
         private bool TryPenetrate(
@@ -293,6 +321,7 @@ namespace PolyStrike.Gameplay
             deployUntil = Time.time + Profile.DeployTime;
             nextShotTime = deployUntil;
             viewmodel?.PlayDeploy(Profile.DeployTime);
+            feedback?.PlayDeploy(activeProfileIndex);
         }
 
         private void TryStartReload()
@@ -308,6 +337,7 @@ namespace PolyStrike.Gameplay
             isReloading = true;
             var profile = profiles[profileIndex];
             viewmodel?.PlayReloadKick();
+            feedback?.PlayReloadStart(profileIndex);
 
             yield return new WaitForSeconds(profile.ReloadClipReadyTime);
 
@@ -321,6 +351,7 @@ namespace PolyStrike.Gameplay
             var loaded = Mathf.Min(needed, reserveAmmo[profileIndex]);
             magazineAmmo[profileIndex] += loaded;
             reserveAmmo[profileIndex] -= loaded;
+            feedback?.PlayReloadInsert(profileIndex);
 
             var tail = Mathf.Max(0f, profile.ReloadFireReadyTime - profile.ReloadClipReadyTime);
             if (tail > 0f)
