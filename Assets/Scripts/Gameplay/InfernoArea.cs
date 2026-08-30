@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using PolyStrike.Match;
 using UnityEngine;
 
 namespace PolyStrike.Gameplay
@@ -8,29 +9,34 @@ namespace PolyStrike.Gameplay
     {
         private const int FlameCount = 16;
         private const float PeakSpreadTime = 1.83f;
-        private const float DamageTick = 0.20f;
+        private const float TeammateOtherDamageScale = 0.4f;
 
         private static readonly List<InfernoArea> Active = new List<InfernoArea>();
         private static Material flameMaterial;
 
         private readonly List<Transform> flames = new List<Transform>();
         private readonly List<Vector3> flamePositions = new List<Vector3>();
+        private MatchParticipant owner;
         private float spawnTime;
         private float radiusMeters;
+        private float lifetime;
 
-        public static InfernoArea Spawn(Vector3 position)
+        public static InfernoArea Spawn(Vector3 position, MatchParticipant thrower = null, bool incendiary = false)
         {
-            var root = new GameObject("Ateş Alanı");
+            var root = new GameObject(incendiary ? "Incendiary Alanı" : "Molotof Alanı");
             root.transform.position = position;
             var inferno = root.AddComponent<InfernoArea>();
-            inferno.Build();
+            inferno.Build(thrower, incendiary);
             return inferno;
         }
 
-        private void Build()
+        private void Build(MatchParticipant thrower, bool incendiary)
         {
+            owner = thrower;
             spawnTime = Time.time;
-            radiusMeters = SourceUnit.ToMeters(GrenadeRules.InfernoRadius);
+            lifetime = incendiary ? GrenadeRules.IncendiaryLifetime : GrenadeRules.MolotovLifetime;
+            var radiusUnits = incendiary ? GrenadeRules.IncendiaryMaxRange : GrenadeRules.MolotovMaxRange;
+            radiusMeters = SourceUnit.ToMeters(radiusUnits);
             Active.Add(this);
 
             for (var i = 0; i < FlameCount; i++)
@@ -61,14 +67,14 @@ namespace PolyStrike.Gameplay
         private void Update()
         {
             var age = Time.time - spawnTime;
-            if (age >= GrenadeRules.InfernoLifetime)
+            if (age >= lifetime)
             {
                 Destroy(gameObject);
                 return;
             }
 
             var spread = Mathf.Clamp01(age / PeakSpreadTime);
-            var fade = Mathf.InverseLerp(GrenadeRules.InfernoLifetime, GrenadeRules.InfernoLifetime - 1f, age);
+            var fade = Mathf.InverseLerp(lifetime, lifetime - 1f, age);
 
             for (var i = 0; i < flames.Count; i++)
             {
@@ -85,10 +91,10 @@ namespace PolyStrike.Gameplay
 
         private IEnumerator DamageLoop()
         {
-            var wait = new WaitForSeconds(DamageTick);
+            var wait = new WaitForSeconds(GrenadeRules.InfernoDamageTick);
             var victims = new HashSet<Health>();
 
-            while (this != null && Time.time - spawnTime < GrenadeRules.InfernoLifetime)
+            while (this != null && Time.time - spawnTime < lifetime)
             {
                 victims.Clear();
                 var age = Time.time - spawnTime;
@@ -107,10 +113,21 @@ namespace PolyStrike.Gameplay
                 }
 
                 foreach (var health in victims)
-                    health.TakeDamage(GrenadeRules.InfernoDamagePerSecond * DamageTick);
+                {
+                    var scale = GetDamageScale(health.GetComponent<MatchParticipant>());
+                    health.TakeDamage(GrenadeRules.InfernoDamagePerSecond * GrenadeRules.InfernoDamageTick * scale);
+                }
 
                 yield return wait;
             }
+        }
+
+        private float GetDamageScale(MatchParticipant victim)
+        {
+            if (owner == null || victim == null || owner.Team != victim.Team || owner == victim)
+                return 1f;
+
+            return TeammateOtherDamageScale;
         }
 
         private void OnDestroy()
