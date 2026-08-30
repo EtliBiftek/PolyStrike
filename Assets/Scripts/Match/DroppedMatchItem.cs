@@ -21,12 +21,17 @@ namespace PolyStrike.Match
         private int magazineAmmo;
         private int reserveAmmo;
         private int spawnRoundNumber = -1;
+        private RoundPhase spawnPhase = RoundPhase.Live;
         private float pickupAvailableAt;
 
         private void Update()
         {
             var match = MatchRoundManager.Instance;
-            if (match != null && spawnRoundNumber >= 0 && match.RoundNumber != spawnRoundNumber && match.Phase == RoundPhase.FreezeTime)
+            if (match == null || match.Phase != RoundPhase.FreezeTime)
+                return;
+
+            var belongsToCurrentFreeze = spawnPhase == RoundPhase.FreezeTime && spawnRoundNumber == match.RoundNumber;
+            if (!belongsToCurrentFreeze)
                 Destroy(gameObject);
         }
 
@@ -116,7 +121,13 @@ namespace PolyStrike.Match
             var item = root.AddComponent<DroppedMatchItem>();
             item.kind = itemKind;
             item.pickupAvailableAt = Time.time + PickupDelay;
-            item.spawnRoundNumber = MatchRoundManager.Instance != null ? MatchRoundManager.Instance.RoundNumber : -1;
+
+            var match = MatchRoundManager.Instance;
+            if (match != null)
+            {
+                item.spawnRoundNumber = match.RoundNumber;
+                item.spawnPhase = match.Phase;
+            }
 
             var body = root.AddComponent<Rigidbody>();
             body.mass = itemKind == DroppedItemKind.PrimaryRifle ? 2.2f : 0.7f;
