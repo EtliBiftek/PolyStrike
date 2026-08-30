@@ -46,6 +46,10 @@ namespace PolyStrike.Core
             CreateBlock(new Vector3(-3f, 1.05f, 6f), new Vector3(2.4f, 2.1f, 0.14f), SurfaceMaterial.Wood, "Ahşap Test Paneli");
             CreateBlock(new Vector3(3f, 1.05f, 7f), new Vector3(2.4f, 2.1f, 0.08f), SurfaceMaterial.Metal, "Metal Test Paneli");
             CreateBlock(new Vector3(0f, 1.05f, 5f), new Vector3(2.4f, 2.1f, 0.05f), SurfaceMaterial.Glass, "Cam Test Paneli");
+
+            CreateBlock(new Vector3(-6f, 0.035f, -2f), new Vector3(3f, 0.07f, 3f), SurfaceMaterial.Metal, "Metal Yürüyüş Alanı");
+            CreateBlock(new Vector3(-2.5f, 0.035f, -2f), new Vector3(3f, 0.07f, 3f), SurfaceMaterial.Wood, "Ahşap Yürüyüş Alanı");
+            CreateBlock(new Vector3(2.5f, 0.035f, -2f), new Vector3(3f, 0.07f, 3f), SurfaceMaterial.Plastic, "Plastik Yürüyüş Alanı");
         }
 
         private static void CreateBlock(Vector3 position, Vector3 scale, SurfaceMaterial material, string objectName = "Duvar")
@@ -75,6 +79,7 @@ namespace PolyStrike.Core
             var movement = player.AddComponent<PlayerMovement>();
             var look = player.AddComponent<PlayerLook>();
             var deathResponse = player.AddComponent<PlayerDeathResponse>();
+            player.AddComponent<PlayerFootstepAudio>();
 
             var cameraObject = new GameObject("Oyuncu Kamerası");
             cameraObject.tag = "MainCamera";
@@ -90,7 +95,9 @@ namespace PolyStrike.Core
             look.SetCamera(cameraObject.transform);
             deathResponse.SetCamera(camera);
 
-            var viewmodel = CreateViewmodel(cameraObject.transform, camera);
+            var viewmodel = CreateViewmodel(cameraObject.transform, camera, out var muzzle);
+            var feedback = cameraObject.AddComponent<CombatFeedback>();
+            feedback.SetMuzzle(muzzle);
 
             var weapon = cameraObject.AddComponent<HitscanWeapon>();
             weapon.SetReferences(camera, look, movement, viewmodel);
@@ -100,7 +107,7 @@ namespace PolyStrike.Core
             player.AddComponent<DebugHud>();
         }
 
-        private static ViewmodelMotion CreateViewmodel(Transform cameraParent, Camera worldCamera)
+        private static ViewmodelMotion CreateViewmodel(Transform cameraParent, Camera worldCamera, out Transform muzzle)
         {
             var viewmodelCameraObject = new GameObject("Viewmodel Kamerası");
             viewmodelCameraObject.transform.SetParent(cameraParent, false);
@@ -122,6 +129,12 @@ namespace PolyStrike.Core
             CreateViewmodelPart(root.transform, "Namlu", new Vector3(0f, 0.012f, 0.40f), new Vector3(0.035f, 0.035f, 0.34f));
             CreateViewmodelPart(root.transform, "Şarjör", new Vector3(0f, -0.075f, 0.08f), new Vector3(0.07f, 0.17f, 0.09f), new Vector3(15f, 0f, 0f));
             CreateViewmodelPart(root.transform, "Dipçik", new Vector3(0f, 0.01f, -0.16f), new Vector3(0.09f, 0.075f, 0.20f), new Vector3(0f, 0f, 5f));
+
+            var muzzleObject = new GameObject("Namlu Ucu");
+            muzzleObject.layer = ViewmodelLayer;
+            muzzleObject.transform.SetParent(root.transform, false);
+            muzzleObject.transform.localPosition = new Vector3(0f, 0.012f, 0.59f);
+            muzzle = muzzleObject.transform;
 
             return root.AddComponent<ViewmodelMotion>();
         }
