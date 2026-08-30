@@ -25,19 +25,18 @@ namespace PolyStrike.Match
                 if (health == null || health.IsDead)
                     continue;
 
-                var target = health.transform.position;
-                var pathDistance = EstimatePropagationDistance(origin, target);
-                if (float.IsNaN(pathDistance) || float.IsInfinity(pathDistance) || pathDistance >= MaximumRange)
+                if (!TryEstimate(origin, health.transform.position, out var pathDistance, out var damage))
                     continue;
 
-                var normalized = Mathf.Clamp01(pathDistance / MaximumRange);
-                var damage = MaximumDamage * Mathf.Pow(1f - normalized, FalloffExponent);
-                var roundedDamage = Mathf.Max(1, Mathf.FloorToInt(damage));
-
-                field.entries.Add(new DamageEntry(health, pathDistance, roundedDamage));
+                field.entries.Add(new DamageEntry(health, pathDistance, damage));
             }
 
             return field;
+        }
+
+        public static int EstimateDamage(Vector3 origin, Vector3 target)
+        {
+            return TryEstimate(origin, target, out _, out var damage) ? damage : 0;
         }
 
         public void ApplyReachedRadius(float radius)
@@ -51,6 +50,21 @@ namespace PolyStrike.Match
                 entry.Applied = true;
                 entry.Health.TakeDamage(entry.Damage);
             }
+        }
+
+        private static bool TryEstimate(Vector3 origin, Vector3 target, out float pathDistance, out int damage)
+        {
+            pathDistance = EstimatePropagationDistance(origin, target);
+            if (float.IsNaN(pathDistance) || float.IsInfinity(pathDistance) || pathDistance >= MaximumRange)
+            {
+                damage = 0;
+                return false;
+            }
+
+            var normalized = Mathf.Clamp01(pathDistance / MaximumRange);
+            var rawDamage = MaximumDamage * Mathf.Pow(1f - normalized, FalloffExponent);
+            damage = Mathf.Max(1, Mathf.FloorToInt(rawDamage));
+            return true;
         }
 
         private static float EstimatePropagationDistance(Vector3 origin, Vector3 target)
