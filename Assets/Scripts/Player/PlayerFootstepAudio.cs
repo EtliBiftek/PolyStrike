@@ -107,14 +107,28 @@ namespace PolyStrike.Player
         private SurfaceMaterial ResolveSurface()
         {
             var origin = transform.position + Vector3.up * 0.18f;
-            if (!Physics.Raycast(origin, Vector3.down, out var hit, 2.3f, ~0, QueryTriggerInteraction.Ignore))
-                return SurfaceMaterial.Concrete;
+            var hits = Physics.RaycastAll(origin, Vector3.down, 2.3f, ~0, QueryTriggerInteraction.Ignore);
+            var closestDistance = float.MaxValue;
+            PenetrableSurface closestSurface = null;
 
-            var surface = hit.collider.GetComponent<PenetrableSurface>();
-            if (surface == null)
-                surface = hit.collider.GetComponentInParent<PenetrableSurface>();
+            for (var i = 0; i < hits.Length; i++)
+            {
+                var hit = hits[i];
+                if (hit.collider.transform.IsChildOf(transform))
+                    continue;
 
-            return surface != null ? surface.Material : SurfaceMaterial.Concrete;
+                if (hit.distance >= closestDistance)
+                    continue;
+
+                var surface = hit.collider.GetComponent<PenetrableSurface>();
+                if (surface == null)
+                    surface = hit.collider.GetComponentInParent<PenetrableSurface>();
+
+                closestDistance = hit.distance;
+                closestSurface = surface;
+            }
+
+            return closestSurface != null ? closestSurface.Material : SurfaceMaterial.Concrete;
         }
     }
 }
