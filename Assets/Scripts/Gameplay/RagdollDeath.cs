@@ -7,30 +7,40 @@ namespace PolyStrike.Gameplay
     {
         [SerializeField] private float impulse = 2.8f;
         [SerializeField] private float upwardImpulse = 0.55f;
-        [SerializeField] private float cleanupDelay = 8f;
 
         private Health health;
         private Rigidbody[] bodies;
+        private Vector3[] initialPositions;
+        private Quaternion[] initialRotations;
 
         private void Awake()
         {
             health = GetComponent<Health>();
             bodies = GetComponentsInChildren<Rigidbody>(true);
+            initialPositions = new Vector3[bodies.Length];
+            initialRotations = new Quaternion[bodies.Length];
 
             for (var i = 0; i < bodies.Length; i++)
             {
-                bodies[i].isKinematic = true;
-                bodies[i].useGravity = false;
-                bodies[i].interpolation = RigidbodyInterpolation.Interpolate;
+                var body = bodies[i];
+                initialPositions[i] = body.transform.localPosition;
+                initialRotations[i] = body.transform.localRotation;
+                body.isKinematic = true;
+                body.useGravity = false;
+                body.interpolation = RigidbodyInterpolation.Interpolate;
             }
 
             health.Died += OnDeath;
+            health.RoundReset += OnRoundReset;
         }
 
         private void OnDestroy()
         {
-            if (health != null)
-                health.Died -= OnDeath;
+            if (health == null)
+                return;
+
+            health.Died -= OnDeath;
+            health.RoundReset -= OnRoundReset;
         }
 
         private void OnDeath()
@@ -56,12 +66,21 @@ namespace PolyStrike.Gameplay
                 struckBody = bodies[0];
 
             if (struckBody != null)
-            {
-                var force = direction * impulse + Vector3.up * upwardImpulse;
-                struckBody.AddForce(force, ForceMode.Impulse);
-            }
+                struckBody.AddForce(direction * impulse + Vector3.up * upwardImpulse, ForceMode.Impulse);
+        }
 
-            Destroy(gameObject, cleanupDelay);
+        private void OnRoundReset()
+        {
+            for (var i = 0; i < bodies.Length; i++)
+            {
+                var body = bodies[i];
+                body.isKinematic = true;
+                body.useGravity = false;
+                body.linearVelocity = Vector3.zero;
+                body.angularVelocity = Vector3.zero;
+                body.transform.localPosition = initialPositions[i];
+                body.transform.localRotation = initialRotations[i];
+            }
         }
     }
 }
