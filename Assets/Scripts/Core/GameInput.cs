@@ -102,6 +102,54 @@ namespace PolyStrike.Core
             }
         }
 
+        public static bool FireReleased
+        {
+            get
+            {
+#if ENABLE_INPUT_SYSTEM
+                return Mouse.current?.leftButton.wasReleasedThisFrame == true;
+#else
+                return Input.GetMouseButtonUp(0);
+#endif
+            }
+        }
+
+        public static bool SecondaryFireHeld
+        {
+            get
+            {
+#if ENABLE_INPUT_SYSTEM
+                return Mouse.current?.rightButton.isPressed == true;
+#else
+                return Input.GetMouseButton(1);
+#endif
+            }
+        }
+
+        public static bool SecondaryFirePressed
+        {
+            get
+            {
+#if ENABLE_INPUT_SYSTEM
+                return Mouse.current?.rightButton.wasPressedThisFrame == true;
+#else
+                return Input.GetMouseButtonDown(1);
+#endif
+            }
+        }
+
+        public static bool SecondaryFireReleased
+        {
+            get
+            {
+#if ENABLE_INPUT_SYSTEM
+                return Mouse.current?.rightButton.wasReleasedThisFrame == true;
+#else
+                return Input.GetMouseButtonUp(1);
+#endif
+            }
+        }
+
         public static bool ReloadPressed
         {
             get
@@ -134,6 +182,66 @@ namespace PolyStrike.Core
                 return Keyboard.current?.digit2Key.wasPressedThisFrame == true;
 #else
                 return Input.GetKeyDown(KeyCode.Alpha2);
+#endif
+            }
+        }
+
+        public static bool UtilityPressed
+        {
+            get
+            {
+#if ENABLE_INPUT_SYSTEM
+                return Keyboard.current?.digit4Key.wasPressedThisFrame == true;
+#else
+                return Input.GetKeyDown(KeyCode.Alpha4);
+#endif
+            }
+        }
+
+        public static bool HeGrenadePressed
+        {
+            get
+            {
+#if ENABLE_INPUT_SYSTEM
+                return Keyboard.current?.digit6Key.wasPressedThisFrame == true;
+#else
+                return Input.GetKeyDown(KeyCode.Alpha6);
+#endif
+            }
+        }
+
+        public static bool FlashbangPressed
+        {
+            get
+            {
+#if ENABLE_INPUT_SYSTEM
+                return Keyboard.current?.digit7Key.wasPressedThisFrame == true;
+#else
+                return Input.GetKeyDown(KeyCode.Alpha7);
+#endif
+            }
+        }
+
+        public static bool SmokePressed
+        {
+            get
+            {
+#if ENABLE_INPUT_SYSTEM
+                return Keyboard.current?.digit8Key.wasPressedThisFrame == true;
+#else
+                return Input.GetKeyDown(KeyCode.Alpha8);
+#endif
+            }
+        }
+
+        public static bool MolotovPressed
+        {
+            get
+            {
+#if ENABLE_INPUT_SYSTEM
+                return Keyboard.current?.digit0Key.wasPressedThisFrame == true;
+#else
+                return Input.GetKeyDown(KeyCode.Alpha0);
 #endif
             }
         }
