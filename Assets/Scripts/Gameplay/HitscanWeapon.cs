@@ -30,6 +30,7 @@ namespace PolyStrike.Gameplay
 
         private MatchTeam matchTeam = MatchTeam.Terrorists;
         private int activeProfileIndex = TPistolIndex;
+        private int ownedPrimaryIndex = -1;
         private int sprayIndex;
         private float accuracyPenalty;
         private float nextShotTime;
@@ -38,17 +39,20 @@ namespace PolyStrike.Gameplay
         private bool isReloading;
         private bool externalInputBlocked;
         private bool primaryOwned;
+        private bool primaryFiredSinceAcquired;
 
         private WeaponTuning Profile => profiles[activeProfileIndex];
-        private int PrimaryIndex => matchTeam == MatchTeam.Terrorists ? TRifleIndex : CTRifleIndex;
+        private int TeamPrimaryIndex => matchTeam == MatchTeam.Terrorists ? TRifleIndex : CTRifleIndex;
         private int SecondaryIndex => matchTeam == MatchTeam.Terrorists ? TPistolIndex : CTPistolIndex;
-        private int AudioStyle => matchTeam == MatchTeam.Terrorists ? 0 : 1;
+        private int PrimaryIndex => primaryOwned ? ownedPrimaryIndex : TeamPrimaryIndex;
+        private int AudioStyle => activeProfileIndex == TRifleIndex || activeProfileIndex == TPistolIndex ? 0 : 1;
 
         public int AmmoInMagazine => magazineAmmo[activeProfileIndex];
         public int ReserveAmmo => reserveAmmo[activeProfileIndex];
         public bool IsReloading => isReloading;
         public bool IsDeploying => Time.time < deployUntil;
         public bool HasPrimary => primaryOwned;
+        public bool IsPrimaryActive => primaryOwned && activeProfileIndex == ownedPrimaryIndex;
         public string DisplayName => Localization.Get(Profile.DisplayNameKey);
         public float MaxMoveSpeedSourceUnits => Profile.MaxMoveSpeedSourceUnits;
         public float CurrentInaccuracy { get; private set; }
@@ -77,24 +81,64 @@ namespace PolyStrike.Gameplay
         public void SetMatchTeam(MatchTeam team)
         {
             matchTeam = team;
-            if (!primaryOwned || activeProfileIndex != PrimaryIndex)
+            if (!primaryOwned)
                 SwitchProfileImmediate(SecondaryIndex);
         }
 
         public void BuyPrimary()
         {
             primaryOwned = true;
-            RefillProfile(PrimaryIndex);
-            SwitchProfile(PrimaryIndex);
+            ownedPrimaryIndex = TeamPrimaryIndex;
+            primaryFiredSinceAcquired = false;
+            RefillProfile(ownedPrimaryIndex);
+            SwitchProfile(ownedPrimaryIndex);
+        }
+
+        public bool TryPickupPrimary(int profileId, int magazine, int reserve)
+        {
+            if (primaryOwned || profileId < TRifleIndex || profileId > CTRifleIndex)
+                return false;
+
+            primaryOwned = true;
+            ownedPrimaryIndex = profileId;
+            primaryFiredSinceAcquired = false;
+            magazineAmmo[profileId] = Mathf.Clamp(magazine, 0, profiles[profileId].MagazineSize);
+            reserveAmmo[profileId] = Mathf.Max(0, reserve);
+            SwitchProfile(profileId);
+            return true;
+        }
+
+        public bool TryDropPrimary(out int profileId, out int magazine, out int reserve)
+        {
+            profileId = -1;
+            magazine = 0;
+            reserve = 0;
+
+            if (!primaryOwned || ownedPrimaryIndex < TRifleIndex || ownedPrimaryIndex > CTRifleIndex)
+                return false;
+
+            profileId = ownedPrimaryIndex;
+            magazine = magazineAmmo[ownedPrimaryIndex];
+            reserve = reserveAmmo[ownedPrimaryIndex];
+
+            var wasActive = activeProfileIndex == ownedPrimaryIndex;
+            primaryOwned = false;
+            ownedPrimaryIndex = -1;
+            primaryFiredSinceAcquired = false;
+
+            if (wasActive)
+                SwitchProfile(SecondaryIndex);
+
+            return true;
         }
 
         public bool CanRefundPrimary()
         {
-            if (!primaryOwned || profiles == null)
+            if (!primaryOwned || profiles == null || primaryFiredSinceAcquired)
                 return false;
 
-            var profile = profiles[PrimaryIndex];
-            return magazineAmmo[PrimaryIndex] == profile.MagazineSize && reserveAmmo[PrimaryIndex] == profile.ReserveAmmo;
+            var profile = profiles[ownedPrimaryIndex];
+            return magazineAmmo[ownedPrimaryIndex] == profile.MagazineSize && reserveAmmo[ownedPrimaryIndex] == profile.ReserveAmmo;
         }
 
         public bool RefundPrimary()
@@ -102,8 +146,14 @@ namespace PolyStrike.Gameplay
             if (!CanRefundPrimary())
                 return false;
 
+            var wasActive = activeProfileIndex == ownedPrimaryIndex;
             primaryOwned = false;
-            SwitchProfile(SecondaryIndex);
+            ownedPrimaryIndex = -1;
+            primaryFiredSinceAcquired = false;
+
+            if (wasActive)
+                SwitchProfile(SecondaryIndex);
+
             return true;
         }
 
@@ -111,6 +161,8 @@ namespace PolyStrike.Gameplay
         {
             matchTeam = team;
             primaryOwned = false;
+            ownedPrimaryIndex = -1;
+            primaryFiredSinceAcquired = false;
             RefillProfile(SecondaryIndex);
             SwitchProfileImmediate(SecondaryIndex);
         }
@@ -120,6 +172,8 @@ namespace PolyStrike.Gameplay
             if (diedLastRound)
             {
                 primaryOwned = false;
+                ownedPrimaryIndex = -1;
+                primaryFiredSinceAcquired = false;
                 RefillProfile(SecondaryIndex);
                 SwitchProfileImmediate(SecondaryIndex);
             }
@@ -156,7 +210,7 @@ namespace PolyStrike.Gameplay
         private void Update()
         {
             if (GameInput.Weapon1Pressed && primaryOwned)
-                SwitchProfile(PrimaryIndex);
+                SwitchProfile(ownedPrimaryIndex);
             else if (GameInput.Weapon2Pressed)
                 SwitchProfile(SecondaryIndex);
 
@@ -194,6 +248,9 @@ namespace PolyStrike.Gameplay
             nextShotTime = Time.time + secondsPerShot;
             lastShotTime = Time.time;
             magazineAmmo[activeProfileIndex]--;
+
+            if (primaryOwned && activeProfileIndex == ownedPrimaryIndex)
+                primaryFiredSinceAcquired = true;
 
             var patternIndex = Mathf.Clamp(sprayIndex, 0, Profile.SprayPattern.Length - 1);
             var recoilPoint = Profile.SprayPattern[patternIndex];
