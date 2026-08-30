@@ -103,6 +103,18 @@ namespace PolyStrike.Gameplay
             return flat.sqrMagnitude <= radiusMeters * radiusMeters;
         }
 
+        public static bool IsPointInsideAny(Vector3 point)
+        {
+            for (var i = Active.Count - 1; i >= 0; i--)
+            {
+                var cloud = Active[i];
+                if (cloud != null && cloud.ContainsPoint(point))
+                    return true;
+            }
+
+            return false;
+        }
+
         public static void PunchLine(Vector3 start, Vector3 end)
         {
             for (var i = Active.Count - 1; i >= 0; i--)
