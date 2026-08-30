@@ -27,11 +27,13 @@ namespace PolyStrike.Match
             public bool HelmetBefore;
             public float ArmorAfter;
             public bool HelmetAfter;
+            public int DamageRevisionAfter;
         }
 
         private MatchParticipant participant;
         private HitscanWeapon weapon;
         private UtilityController utility;
+        private C4Controller c4;
         private readonly List<PurchaseRecord> purchases = new List<PurchaseRecord>();
         private int observedRound = -1;
         private bool open;
@@ -45,6 +47,7 @@ namespace PolyStrike.Match
             participant = GetComponent<MatchParticipant>();
             weapon = GetComponentInChildren<HitscanWeapon>();
             utility = GetComponent<UtilityController>();
+            c4 = GetComponent<C4Controller>();
         }
 
         private void Update()
@@ -199,7 +202,8 @@ namespace PolyStrike.Match
                 ArmorBefore = beforeArmor,
                 HelmetBefore = beforeHelmet,
                 ArmorAfter = participant.Health.Armor,
-                HelmetAfter = participant.Health.HasHelmet
+                HelmetAfter = participant.Health.HasHelmet,
+                DamageRevisionAfter = participant.Health.DamageRevision
             });
         }
 
@@ -270,7 +274,8 @@ namespace PolyStrike.Match
                     return weapon != null && weapon.CanRefundPrimary();
 
                 case PurchaseKind.Armor:
-                    return Mathf.Approximately(participant.Health.Armor, record.ArmorAfter) &&
+                    return participant.Health.DamageRevision == record.DamageRevisionAfter &&
+                           Mathf.Approximately(participant.Health.Armor, record.ArmorAfter) &&
                            participant.Health.HasHelmet == record.HelmetAfter;
 
                 case PurchaseKind.DefuseKit:
@@ -337,8 +342,9 @@ namespace PolyStrike.Match
 
             var match = MatchRoundManager.Instance;
             var roundLocked = match != null && (match.Phase == RoundPhase.FreezeTime || match.Phase == RoundPhase.RoundEnd || match.Phase == RoundPhase.HalfTime || match.Phase == RoundPhase.MatchEnd);
-            weapon?.SetExternalInputBlocked(roundLocked);
-            utility?.SetExternalInputBlocked(roundLocked);
+            var bombEquipped = c4 != null && c4.IsBombEquipped;
+            weapon?.SetExternalInputBlocked(roundLocked || bombEquipped);
+            utility?.SetExternalInputBlocked(roundLocked || bombEquipped);
 
             if (participant.IsAlive && match != null && match.Phase != RoundPhase.MatchEnd)
             {
