@@ -17,10 +17,7 @@ namespace PolyStrike.Match
         private void Awake()
         {
             participant = GetComponent<MatchParticipant>();
-            movement = GetComponent<PlayerMovement>();
-            weapon = GetComponentInChildren<HitscanWeapon>();
-            utility = GetComponent<UtilityController>();
-            c4 = GetComponent<C4Controller>();
+            ResolveReferences();
         }
 
         private void Update()
@@ -28,11 +25,12 @@ namespace PolyStrike.Match
             if (!participant.IsLocalPlayer || !participant.IsAlive || !GameInput.DropPressed)
                 return;
 
+            ResolveReferences();
+
             var match = MatchRoundManager.Instance;
             if (match == null || (match.Phase != RoundPhase.FreezeTime && match.Phase != RoundPhase.Live))
                 return;
 
-            c4 ??= GetComponent<C4Controller>();
             if (c4 != null && c4.IsBombEquipped && participant.CarriesBomb)
             {
                 c4.DropCarriedBomb(true);
@@ -51,6 +49,14 @@ namespace PolyStrike.Match
 
             if (weapon != null && weapon.IsPrimaryActive && weapon.TryDropPrimary(out var profileId, out var magazine, out var reserve))
                 DroppedMatchItem.SpawnPrimaryRifle(origin, toss, profileId, magazine, reserve);
+        }
+
+        private void ResolveReferences()
+        {
+            movement ??= GetComponent<PlayerMovement>();
+            weapon ??= GetComponentInChildren<HitscanWeapon>();
+            utility ??= GetComponent<UtilityController>();
+            c4 ??= GetComponent<C4Controller>();
         }
     }
 }
