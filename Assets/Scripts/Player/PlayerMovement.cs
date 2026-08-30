@@ -51,6 +51,7 @@ namespace PolyStrike.Player
             : heldWeapon != null ? heldWeapon.MaxMoveSpeedSourceUnits : 250f;
         public float VelocityModifier => velocityModifier;
         public Vector3 WorldVelocity => planarVelocity + Vector3.up * verticalVelocity;
+        public float LastJumpTime { get; private set; } = -10f;
 
         public void SetHeldWeapon(HitscanWeapon weapon)
         {
@@ -75,8 +76,6 @@ namespace PolyStrike.Player
 
             var mobilityAdjustment = (MaxSpeedSourceUnits - 225f) * TargetMobilitySlope;
             var firstHitFactor = Mathf.Clamp(newSpeedVsM4 + mobilityAdjustment, 0.15f, 0.5f);
-
-            // Valve'ın örneklerindeki ardışık hitler hızla bir tabana yaklaşıyor.
             var cumulativeFactor = firstHitFactor * (0.65f + 0.35f * Mathf.Pow(0.25f, rapidTagHits - 1));
             pendingTagFactor = pendingTagApplyTime < 0f
                 ? cumulativeFactor
@@ -113,7 +112,10 @@ namespace PolyStrike.Player
                 Accelerate(wishDirection, wishSpeed, GroundAcceleration);
 
                 if (GameInput.JumpPressed && duckAmount < 0.95f)
+                {
                     verticalVelocity = SourceUnit.ToMeters(JumpImpulse);
+                    LastJumpTime = Time.time;
+                }
             }
             else
             {
@@ -203,7 +205,6 @@ namespace PolyStrike.Player
             if (speedToAdd <= 0f)
                 return;
 
-            // Source'un hava hareketinde cap sadece speedToAdd hesabında kullanılıyor.
             var accelerationStep = AirAcceleration * uncappedWishSpeed * Time.deltaTime;
             planarVelocity += direction * Mathf.Min(accelerationStep, speedToAdd);
         }
