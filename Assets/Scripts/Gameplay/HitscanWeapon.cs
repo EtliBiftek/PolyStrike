@@ -40,11 +40,11 @@ namespace PolyStrike.Gameplay
         private bool externalInputBlocked;
         private bool primaryOwned;
         private bool primaryFiredSinceAcquired;
+        private bool primaryRefundEligible;
 
         private WeaponTuning Profile => profiles[activeProfileIndex];
         private int TeamPrimaryIndex => matchTeam == MatchTeam.Terrorists ? TRifleIndex : CTRifleIndex;
         private int SecondaryIndex => matchTeam == MatchTeam.Terrorists ? TPistolIndex : CTPistolIndex;
-        private int PrimaryIndex => primaryOwned ? ownedPrimaryIndex : TeamPrimaryIndex;
         private int AudioStyle => activeProfileIndex == TRifleIndex || activeProfileIndex == TPistolIndex ? 0 : 1;
 
         public int AmmoInMagazine => magazineAmmo[activeProfileIndex];
@@ -90,6 +90,7 @@ namespace PolyStrike.Gameplay
             primaryOwned = true;
             ownedPrimaryIndex = TeamPrimaryIndex;
             primaryFiredSinceAcquired = false;
+            primaryRefundEligible = true;
             RefillProfile(ownedPrimaryIndex);
             SwitchProfile(ownedPrimaryIndex);
         }
@@ -102,6 +103,7 @@ namespace PolyStrike.Gameplay
             primaryOwned = true;
             ownedPrimaryIndex = profileId;
             primaryFiredSinceAcquired = false;
+            primaryRefundEligible = false;
             magazineAmmo[profileId] = Mathf.Clamp(magazine, 0, profiles[profileId].MagazineSize);
             reserveAmmo[profileId] = Mathf.Max(0, reserve);
             SwitchProfile(profileId);
@@ -125,6 +127,7 @@ namespace PolyStrike.Gameplay
             primaryOwned = false;
             ownedPrimaryIndex = -1;
             primaryFiredSinceAcquired = false;
+            primaryRefundEligible = false;
 
             if (wasActive)
                 SwitchProfile(SecondaryIndex);
@@ -134,7 +137,7 @@ namespace PolyStrike.Gameplay
 
         public bool CanRefundPrimary()
         {
-            if (!primaryOwned || profiles == null || primaryFiredSinceAcquired)
+            if (!primaryOwned || profiles == null || primaryFiredSinceAcquired || !primaryRefundEligible)
                 return false;
 
             var profile = profiles[ownedPrimaryIndex];
@@ -150,6 +153,7 @@ namespace PolyStrike.Gameplay
             primaryOwned = false;
             ownedPrimaryIndex = -1;
             primaryFiredSinceAcquired = false;
+            primaryRefundEligible = false;
 
             if (wasActive)
                 SwitchProfile(SecondaryIndex);
@@ -163,6 +167,7 @@ namespace PolyStrike.Gameplay
             primaryOwned = false;
             ownedPrimaryIndex = -1;
             primaryFiredSinceAcquired = false;
+            primaryRefundEligible = false;
             RefillProfile(SecondaryIndex);
             SwitchProfileImmediate(SecondaryIndex);
         }
@@ -174,6 +179,7 @@ namespace PolyStrike.Gameplay
                 primaryOwned = false;
                 ownedPrimaryIndex = -1;
                 primaryFiredSinceAcquired = false;
+                primaryRefundEligible = false;
                 RefillProfile(SecondaryIndex);
                 SwitchProfileImmediate(SecondaryIndex);
             }
@@ -250,7 +256,10 @@ namespace PolyStrike.Gameplay
             magazineAmmo[activeProfileIndex]--;
 
             if (primaryOwned && activeProfileIndex == ownedPrimaryIndex)
+            {
                 primaryFiredSinceAcquired = true;
+                primaryRefundEligible = false;
+            }
 
             var patternIndex = Mathf.Clamp(sprayIndex, 0, Profile.SprayPattern.Length - 1);
             var recoilPoint = Profile.SprayPattern[patternIndex];
