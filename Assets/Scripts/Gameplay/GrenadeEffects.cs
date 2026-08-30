@@ -49,7 +49,7 @@ namespace PolyStrike.Gameplay
             PlayWorldClip(GetBounceClip(surface), position, volume, 18f);
         }
 
-        public static void Detonate(GrenadeType type, Vector3 position, Transform owner)
+        public static void Detonate(GrenadeType type, Vector3 position)
         {
             EnsureExists();
 
