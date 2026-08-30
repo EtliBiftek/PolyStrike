@@ -222,6 +222,18 @@ namespace PolyStrike.Core
             }
         }
 
+        public static bool BombPressed
+        {
+            get
+            {
+#if ENABLE_INPUT_SYSTEM
+                return Keyboard.current?.digit5Key.wasPressedThisFrame == true;
+#else
+                return Input.GetKeyDown(KeyCode.Alpha5);
+#endif
+            }
+        }
+
         public static bool HeGrenadePressed
         {
             get
