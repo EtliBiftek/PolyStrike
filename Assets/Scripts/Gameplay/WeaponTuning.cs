@@ -4,7 +4,7 @@ namespace PolyStrike.Gameplay
 {
     public sealed class WeaponTuning
     {
-        public string DisplayName { get; private set; }
+        public string DisplayNameKey { get; private set; }
         public float Damage { get; private set; }
         public float RangeMeters { get; private set; }
         public float RangeModifier { get; private set; }
@@ -30,7 +30,7 @@ namespace PolyStrike.Gameplay
         {
             return new WeaponTuning
             {
-                DisplayName = "T Tüfeği",
+                DisplayNameKey = "weapon.t_rifle",
                 Damage = 36f,
                 RangeMeters = 120f,
                 RangeModifier = 0.98f,
@@ -66,7 +66,7 @@ namespace PolyStrike.Gameplay
         {
             return new WeaponTuning
             {
-                DisplayName = "CT Tüfeği",
+                DisplayNameKey = "weapon.ct_rifle",
                 Damage = 33f,
                 RangeMeters = 120f,
                 RangeModifier = 0.97f,
