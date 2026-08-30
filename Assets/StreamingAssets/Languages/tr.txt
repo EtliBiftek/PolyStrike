@@ -2,7 +2,7 @@
 # Yeni bir dil eklemek için bu dosyayı kopyalayıp örneğin en.txt olarak çevirmen yeterli.
 
 prototype.title=PolyStrike - CS2 Hissi Prototipi
-prototype.controls=WASD: Hareket | Shift: Yürü | Space: Zıpla | Ctrl/C: Çömel | 1: Primary | 2: Tabanca | B: Satın Al | E: Plant/Defuse | 4: Utility | 6: HE | 7: Flash | 8: Smoke | 0: Molotof | R: Şarjör Değiştir
+prototype.controls=WASD: Hareket | Shift: Yürü | Space: Zıpla | Ctrl/C: Çömel | 1: Primary | 2: Tabanca | B: Satın Al | E: Plant/Defuse | 4: Utility | 6: HE | 7: Flash | 8: Smoke | 0: Ateş Bombası | R: Şarjör Değiştir
 
 team.t=T
 team.ct=CT
@@ -65,6 +65,7 @@ buy.he=HE Bombası
 buy.flash=Flashbang
 buy.smoke=Sis Bombası
 buy.molotov=Molotof
+buy.incendiary=Yangın Bombası
 buy.item_price={0}  -  ${1}
 buy.item_count_price={0} x{1}  -  ${2}
 buy.item_owned={0}  -  ALINDI
