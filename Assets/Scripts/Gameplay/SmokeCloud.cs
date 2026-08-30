@@ -8,6 +8,7 @@ namespace PolyStrike.Gameplay
     {
         private const float BulletHoleDuration = 1.0f;
         private const float HeClearDuration = 2.0f;
+        private const float C4ClearDuration = 2.5f;
         private const float FadeDuration = 2.5f;
         private const int CellCount = 24;
 
@@ -135,7 +136,20 @@ namespace PolyStrike.Gameplay
             {
                 var cloud = Active[i];
                 if (cloud != null)
-                    cloud.ClearCellsInRadius(center, blastRadius);
+                    cloud.ClearCellsInRadius(center, blastRadius, HeClearDuration);
+            }
+        }
+
+        public static void ShockwaveClear(Vector3 center, float radiusMeters)
+        {
+            if (radiusMeters <= 0f)
+                return;
+
+            for (var i = Active.Count - 1; i >= 0; i--)
+            {
+                var cloud = Active[i];
+                if (cloud != null)
+                    cloud.ClearCellsInRadius(center, radiusMeters, C4ClearDuration);
             }
         }
 
@@ -156,13 +170,13 @@ namespace PolyStrike.Gameplay
             }
         }
 
-        private void ClearCellsInRadius(Vector3 blastCenter, float blastRadius)
+        private void ClearCellsInRadius(Vector3 blastCenter, float blastRadius, float duration)
         {
             var radiusSquared = blastRadius * blastRadius;
             for (var i = 0; i < cells.Count; i++)
             {
                 if ((cells[i].position - blastCenter).sqrMagnitude <= radiusSquared)
-                    hiddenUntil[i] = Mathf.Max(hiddenUntil[i], Time.time + HeClearDuration);
+                    hiddenUntil[i] = Mathf.Max(hiddenUntil[i], Time.time + duration);
             }
         }
 
