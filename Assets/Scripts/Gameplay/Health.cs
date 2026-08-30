@@ -22,6 +22,7 @@ namespace PolyStrike.Gameplay
         public float Armor { get; private set; }
         public bool HasHelmet => hasHelmet;
         public bool IsDead { get; private set; }
+        public int DamageRevision { get; private set; }
         public Vector3 LastBulletDirection { get; private set; }
         public HitGroup LastHitGroup { get; private set; } = HitGroup.Chest;
 
@@ -91,7 +92,12 @@ namespace PolyStrike.Gameplay
             if (IsDead || amount <= 0f)
                 return;
 
-            Current = Mathf.Max(0f, Current - Mathf.Floor(amount));
+            var dealt = Mathf.Max(0, Mathf.FloorToInt(amount));
+            if (dealt <= 0)
+                return;
+
+            Current = Mathf.Max(0f, Current - dealt);
+            DamageRevision++;
             Changed?.Invoke(Current, maxHealth);
 
             if (Current <= 0f)
@@ -111,6 +117,7 @@ namespace PolyStrike.Gameplay
         {
             IsDead = false;
             Current = maxHealth;
+            DamageRevision = 0;
             LastBulletDirection = Vector3.zero;
             LastHitGroup = HitGroup.Chest;
 
@@ -164,6 +171,9 @@ namespace PolyStrike.Gameplay
             Armor = Mathf.Max(0f, Armor - armorSpent);
             if (Armor <= 0f)
                 hasHelmet = false;
+
+            if (dealt > 0 || armorSpent > 0)
+                DamageRevision++;
 
             Changed?.Invoke(Current, maxHealth);
             if (armorSpent > 0)
