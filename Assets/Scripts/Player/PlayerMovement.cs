@@ -1,4 +1,5 @@
 using PolyStrike.Core;
+using PolyStrike.Gameplay;
 using UnityEngine;
 
 namespace PolyStrike.Player
@@ -6,27 +7,39 @@ namespace PolyStrike.Player
     [RequireComponent(typeof(CharacterController))]
     public sealed class PlayerMovement : MonoBehaviour
     {
-        [Header("Hız")]
-        [SerializeField] private float maxGroundSpeed = 5.5f;
-        [SerializeField] private float crouchSpeed = 3.4f;
-        [SerializeField] private float groundAcceleration = 16f;
-        [SerializeField] private float airAcceleration = 4f;
-        [SerializeField] private float groundFriction = 7f;
+        private const float GroundAcceleration = 5.5f;
+        private const float AirAcceleration = 12f;
+        private const float GroundFriction = 5.2f;
+        private const float StopSpeed = 80f;
+        private const float AirWishSpeedCap = 30f;
+        private const float Gravity = 800f;
+        private const float JumpImpulse = 301.99338f;
+        private const float WalkMultiplier = 0.52f;
+        private const float DuckMultiplier = 0.34f;
+        private const float DuckRate = 6.4f;
 
-        [Header("Zıplama")]
-        [SerializeField] private float jumpHeight = 1.15f;
-        [SerializeField] private float gravity = -25f;
-
-        [Header("Çömelme")]
-        [SerializeField] private float standingHeight = 1.8f;
-        [SerializeField] private float crouchingHeight = 1.15f;
-        [SerializeField] private float crouchTransitionSpeed = 8f;
+        [Header("Boyut")]
+        [SerializeField] private float standingHeight = 1.829f;
+        [SerializeField] private float crouchingHeight = 1.372f;
 
         private CharacterController controller;
+        private HitscanWeapon heldWeapon;
         private Vector3 planarVelocity;
         private float verticalVelocity;
+        private float duckAmount;
 
-        public bool IsCrouching { get; private set; }
+        public bool IsGrounded => controller != null && controller.isGrounded;
+        public bool IsCrouching => duckAmount > 0.5f;
+        public float DuckAmount => duckAmount;
+        public Vector3 PlanarVelocity => planarVelocity;
+        public float VerticalVelocity => verticalVelocity;
+        public float SpeedSourceUnits => SourceUnit.ToSourceUnits(planarVelocity.magnitude);
+        public float MaxSpeedSourceUnits => heldWeapon != null ? heldWeapon.MaxMoveSpeedSourceUnits : 250f;
+
+        public void SetHeldWeapon(HitscanWeapon weapon)
+        {
+            heldWeapon = weapon;
+        }
 
         private void Awake()
         {
@@ -37,34 +50,33 @@ namespace PolyStrike.Player
 
         private void Update()
         {
-            IsCrouching = GameInput.CrouchHeld;
-            UpdateControllerHeight();
+            UpdateDuck();
 
             var input = GameInput.Movement;
+            var inputLength = Mathf.Clamp01(input.magnitude);
             var wishDirection = transform.forward * input.y + transform.right * input.x;
-            if (wishDirection.sqrMagnitude > 1f)
+            if (wishDirection.sqrMagnitude > 0.001f)
                 wishDirection.Normalize();
 
-            var grounded = controller.isGrounded;
-            if (grounded)
+            if (controller.isGrounded)
             {
                 if (verticalVelocity < 0f)
-                    verticalVelocity = -2f;
+                    verticalVelocity = -0.5f;
 
                 ApplyGroundFriction();
 
-                var targetSpeed = IsCrouching ? crouchSpeed : maxGroundSpeed;
-                Accelerate(wishDirection, targetSpeed, groundAcceleration);
+                var wishSpeed = GetGroundWishSpeed(inputLength);
+                Accelerate(wishDirection, wishSpeed, GroundAcceleration);
 
-                if (GameInput.JumpPressed && !IsCrouching)
-                    verticalVelocity = Mathf.Sqrt(jumpHeight * -2f * gravity);
+                if (GameInput.JumpPressed && duckAmount < 0.95f)
+                    verticalVelocity = SourceUnit.ToMeters(JumpImpulse);
             }
             else
             {
-                Accelerate(wishDirection, maxGroundSpeed, airAcceleration);
+                ApplyAirAcceleration(wishDirection, inputLength);
             }
 
-            verticalVelocity += gravity * Time.deltaTime;
+            verticalVelocity -= SourceUnit.ToMeters(Gravity) * Time.deltaTime;
 
             var velocity = planarVelocity + Vector3.up * verticalVelocity;
             var collision = controller.Move(velocity * Time.deltaTime);
@@ -73,42 +85,74 @@ namespace PolyStrike.Player
                 verticalVelocity = 0f;
         }
 
+        private float GetGroundWishSpeed(float inputLength)
+        {
+            var maxSpeed = SourceUnit.ToMeters(MaxSpeedSourceUnits);
+
+            if (GameInput.WalkHeld)
+                maxSpeed *= WalkMultiplier;
+
+            maxSpeed *= Mathf.Lerp(1f, DuckMultiplier, duckAmount);
+            return maxSpeed * inputLength;
+        }
+
         private void ApplyGroundFriction()
         {
             var speed = planarVelocity.magnitude;
-            if (speed < 0.01f)
+            if (speed < 0.001f)
             {
                 planarVelocity = Vector3.zero;
                 return;
             }
 
-            var drop = speed * groundFriction * Time.deltaTime;
+            var stopSpeed = SourceUnit.ToMeters(StopSpeed);
+            var control = Mathf.Max(speed, stopSpeed);
+            var drop = control * GroundFriction * Time.deltaTime;
             var nextSpeed = Mathf.Max(speed - drop, 0f);
+
             planarVelocity *= nextSpeed / speed;
         }
 
-        private void Accelerate(Vector3 direction, float targetSpeed, float acceleration)
+        private void Accelerate(Vector3 direction, float wishSpeed, float acceleration)
         {
-            if (direction.sqrMagnitude < 0.001f)
+            if (direction.sqrMagnitude < 0.001f || wishSpeed <= 0f)
                 return;
 
             var currentSpeed = Vector3.Dot(planarVelocity, direction);
-            var speedToAdd = targetSpeed - currentSpeed;
+            var speedToAdd = wishSpeed - currentSpeed;
             if (speedToAdd <= 0f)
                 return;
 
-            var accelerationStep = acceleration * targetSpeed * Time.deltaTime;
+            var accelerationStep = acceleration * wishSpeed * Time.deltaTime;
             planarVelocity += direction * Mathf.Min(accelerationStep, speedToAdd);
         }
 
-        private void UpdateControllerHeight()
+        private void ApplyAirAcceleration(Vector3 direction, float inputLength)
         {
-            var targetHeight = IsCrouching ? crouchingHeight : standingHeight;
-            controller.height = Mathf.MoveTowards(
-                controller.height,
-                targetHeight,
-                crouchTransitionSpeed * Time.deltaTime);
-            controller.center = Vector3.up * (controller.height * 0.5f);
+            if (direction.sqrMagnitude < 0.001f || inputLength <= 0f)
+                return;
+
+            var uncappedWishSpeed = SourceUnit.ToMeters(MaxSpeedSourceUnits) * inputLength;
+            var cappedWishSpeed = Mathf.Min(uncappedWishSpeed, SourceUnit.ToMeters(AirWishSpeedCap));
+            var currentSpeed = Vector3.Dot(planarVelocity, direction);
+            var speedToAdd = cappedWishSpeed - currentSpeed;
+
+            if (speedToAdd <= 0f)
+                return;
+
+            // Source'un hava hareketinde cap sadece speedToAdd hesabında kullanılıyor.
+            var accelerationStep = AirAcceleration * uncappedWishSpeed * Time.deltaTime;
+            planarVelocity += direction * Mathf.Min(accelerationStep, speedToAdd);
+        }
+
+        private void UpdateDuck()
+        {
+            var target = GameInput.CrouchHeld ? 1f : 0f;
+            duckAmount = Mathf.MoveTowards(duckAmount, target, DuckRate * Time.deltaTime);
+
+            var height = Mathf.Lerp(standingHeight, crouchingHeight, duckAmount);
+            controller.height = height;
+            controller.center = Vector3.up * (height * 0.5f);
         }
     }
 }
