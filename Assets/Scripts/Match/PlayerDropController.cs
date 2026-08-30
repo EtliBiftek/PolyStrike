@@ -14,14 +14,6 @@ namespace PolyStrike.Match
         private UtilityController utility;
         private C4Controller c4;
 
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-        private static void CreateInstaller()
-        {
-            var root = new GameObject("Player Drop Installer");
-            Object.DontDestroyOnLoad(root);
-            root.AddComponent<PlayerDropInstaller>();
-        }
-
         private void Awake()
         {
             participant = GetComponent<MatchParticipant>();
@@ -59,25 +51,6 @@ namespace PolyStrike.Match
 
             if (weapon != null && weapon.IsPrimaryActive && weapon.TryDropPrimary(out var profileId, out var magazine, out var reserve))
                 DroppedMatchItem.SpawnPrimaryRifle(origin, toss, profileId, magazine, reserve);
-        }
-    }
-
-    public sealed class PlayerDropInstaller : MonoBehaviour
-    {
-        private void Start()
-        {
-            var participants = Object.FindObjectsByType<MatchParticipant>(FindObjectsSortMode.None);
-            for (var i = 0; i < participants.Length; i++)
-            {
-                var participant = participants[i];
-                if (participant == null || !participant.IsLocalPlayer)
-                    continue;
-
-                if (participant.GetComponent<PlayerDropController>() == null)
-                    participant.gameObject.AddComponent<PlayerDropController>();
-            }
-
-            Destroy(gameObject);
         }
     }
 }
