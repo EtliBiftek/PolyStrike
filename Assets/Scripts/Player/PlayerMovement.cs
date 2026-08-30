@@ -33,6 +33,7 @@ namespace PolyStrike.Player
         private float verticalVelocity;
         private float duckAmount;
         private float externalMaxSpeedSourceUnits = -1f;
+        private bool roundMovementLocked;
 
         private float velocityModifier = 1f;
         private float pendingTagFactor = 1f;
@@ -42,6 +43,7 @@ namespace PolyStrike.Player
 
         public bool IsGrounded => controller != null && controller.isGrounded;
         public bool IsCrouching => duckAmount > 0.5f;
+        public bool IsRoundMovementLocked => roundMovementLocked;
         public float DuckAmount => duckAmount;
         public Vector3 PlanarVelocity => planarVelocity;
         public float VerticalVelocity => verticalVelocity;
@@ -66,6 +68,29 @@ namespace PolyStrike.Player
         public void ClearExternalMaxSpeed()
         {
             externalMaxSpeedSourceUnits = -1f;
+        }
+
+        public void SetRoundMovementLocked(bool locked)
+        {
+            roundMovementLocked = locked;
+            if (!locked)
+                return;
+
+            planarVelocity = Vector3.zero;
+            verticalVelocity = 0f;
+        }
+
+        public void ResetRoundMotion()
+        {
+            planarVelocity = Vector3.zero;
+            verticalVelocity = 0f;
+            velocityModifier = 1f;
+            pendingTagFactor = 1f;
+            pendingTagApplyTime = -1f;
+            rapidTagHits = 0;
+            lastTagTime = -10f;
+            duckAmount = 0f;
+            UpdateControllerHeight();
         }
 
         public void ApplyTag(float newSpeedVsM4)
@@ -94,6 +119,13 @@ namespace PolyStrike.Player
         {
             UpdateTagging();
             UpdateDuck();
+
+            if (roundMovementLocked)
+            {
+                planarVelocity = Vector3.zero;
+                verticalVelocity = 0f;
+                return;
+            }
 
             var input = GameInput.Movement;
             var inputLength = Mathf.Clamp01(input.magnitude);
@@ -211,9 +243,13 @@ namespace PolyStrike.Player
 
         private void UpdateDuck()
         {
-            var target = GameInput.CrouchHeld ? 1f : 0f;
+            var target = roundMovementLocked ? 0f : GameInput.CrouchHeld ? 1f : 0f;
             duckAmount = Mathf.MoveTowards(duckAmount, target, DuckRate * Time.deltaTime);
+            UpdateControllerHeight();
+        }
 
+        private void UpdateControllerHeight()
+        {
             var height = Mathf.Lerp(standingHeight, crouchingHeight, duckAmount);
             controller.height = height;
             controller.center = Vector3.up * (height * 0.5f);
