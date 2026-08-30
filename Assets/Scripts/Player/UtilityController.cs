@@ -12,6 +12,8 @@ namespace PolyStrike.Player
         private const float JumpLatchMaxAge = 0.20f;
         private const float JumpReleaseBeforeWindow = 6f / 64f;
         private const float JumpReleaseAfterWindow = 12f / 64f;
+        private const float StandingJumpLatchVelocity = 218.86838f;
+        private const float CrouchJumpLatchBonus = 3.125f;
 
         private PlayerLook playerLook;
         private PlayerMovement movement;
@@ -130,6 +132,20 @@ namespace PolyStrike.Player
                 yield break;
             }
 
+            if (movement != null)
+            {
+                var jumpTime = movement.LastJumpTime;
+                var releaseInJumpWindow = releaseTime >= jumpTime - JumpReleaseBeforeWindow &&
+                                          releaseTime <= jumpTime + JumpReleaseAfterWindow;
+                var latchTime = jumpTime + JumpLatchDelay;
+
+                // CS2 erken jump-throw'ları bir kez erteliyor; latch hazır olmadan live pose ile atmıyor.
+                if (releaseInJumpWindow && Time.time < latchTime)
+                    yield return new WaitForSeconds(latchTime - Time.time);
+
+                UpdateJumpLatch();
+            }
+
             var pose = ResolveConstructionPose(releaseTime);
             var launch = BuildLaunch(strength, pose);
             SpawnProjectile(type, launch.Position, launch.VelocitySourceUnits);
@@ -152,7 +168,7 @@ namespace PolyStrike.Player
             if (pendingJumpLatchTime < 0f || Time.time < pendingJumpLatchTime)
                 return;
 
-            jumpLatch = CapturePose();
+            jumpLatch = CaptureJumpPose();
             jumpLatchCapturedAt = Time.time;
             pendingJumpLatchTime = -1f;
             hasJumpLatch = true;
@@ -173,6 +189,14 @@ namespace PolyStrike.Player
             var eye = playerLook != null ? playerLook.AimOrigin : transform.position + Vector3.up * 1.6f;
             var velocity = movement != null ? movement.WorldVelocity : Vector3.zero;
             return new ThrowPose(eye, rotation, velocity);
+        }
+
+        private ThrowPose CaptureJumpPose()
+        {
+            var pose = CapturePose();
+            var velocityUnits = SourceUnit.ToSourceUnits(pose.WorldVelocity);
+            velocityUnits.y = StandingJumpLatchVelocity + (movement != null && movement.IsCrouching ? CrouchJumpLatchBonus : 0f);
+            return new ThrowPose(pose.EyePosition, pose.Rotation, SourceUnit.ToMeters(velocityUnits));
         }
 
         private LaunchState BuildLaunch(float strength, ThrowPose pose)
