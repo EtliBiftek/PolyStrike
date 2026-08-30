@@ -8,15 +8,25 @@ namespace PolyStrike.Player
         [SerializeField] private Transform cameraTransform;
         [SerializeField] private float sensitivity = 0.085f;
         [SerializeField] private float standingEyeHeight = 1.62f;
-        [SerializeField] private float crouchingEyeHeight = 0.98f;
+        [SerializeField] private float crouchingEyeHeight = 1.18f;
         [SerializeField] private float eyeTransitionSpeed = 8f;
+        [SerializeField] private float recoilReturnSpeed = 18f;
 
         private PlayerMovement movement;
+        private Vector2 cameraRecoil;
         private float pitch;
+
+        public Quaternion AimRotation => Quaternion.Euler(pitch, transform.eulerAngles.y, 0f);
+        public Vector3 AimOrigin => cameraTransform != null ? cameraTransform.position : transform.position;
 
         public void SetCamera(Transform targetCamera)
         {
             cameraTransform = targetCamera;
+        }
+
+        public void AddCameraRecoil(Vector2 recoilDelta)
+        {
+            cameraRecoil += recoilDelta;
         }
 
         private void Awake()
@@ -51,13 +61,17 @@ namespace PolyStrike.Player
 
             var delta = GameInput.MouseDelta * sensitivity;
             pitch = Mathf.Clamp(pitch - delta.y, -89f, 89f);
-
             transform.Rotate(0f, delta.x, 0f, Space.Self);
-            cameraTransform.localRotation = Quaternion.Euler(pitch, 0f, 0f);
+
+            cameraRecoil = Vector2.MoveTowards(cameraRecoil, Vector2.zero, recoilReturnSpeed * Time.deltaTime);
+            cameraTransform.localRotation = Quaternion.Euler(
+                pitch - cameraRecoil.y,
+                cameraRecoil.x,
+                0f);
 
             if (movement != null)
             {
-                var targetHeight = movement.IsCrouching ? crouchingEyeHeight : standingEyeHeight;
+                var targetHeight = Mathf.Lerp(standingEyeHeight, crouchingEyeHeight, movement.DuckAmount);
                 var position = cameraTransform.localPosition;
                 position.y = Mathf.MoveTowards(position.y, targetHeight, eyeTransitionSpeed * Time.deltaTime);
                 cameraTransform.localPosition = position;
