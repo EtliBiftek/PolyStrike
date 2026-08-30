@@ -1,0 +1,18 @@
+PolyStrike movement tuning reference
+
+Current CS2 values used as the starting point:
+- sv_accelerate: 5.5
+- sv_airaccelerate: 12
+- sv_air_max_wishspeed: 30 u/s
+- sv_friction: 5.2
+- sv_stopspeed: 80 u/s
+- sv_gravity: 800 u/s^2
+- walk multiplier: 0.52
+- crouch multiplier: 0.34
+- crouch transition: 0.15625 s
+- standing hull: 72 u
+- crouched hull: 54 u
+
+1 Unity metre is treated as 39.37 Source units.
+
+Weapon benchmarks currently used for tuning are based on the AK-47 and M4A4 movement/accuracy envelopes. The game keeps its own weapon names and can diverge later for balance.
