@@ -26,7 +26,7 @@ namespace PolyStrike.Match
         private void Update()
         {
             var match = MatchRoundManager.Instance;
-            if (match != null && spawnRoundNumber >= 0 && match.RoundNumber != spawnRoundNumber)
+            if (match != null && spawnRoundNumber >= 0 && match.RoundNumber != spawnRoundNumber && match.Phase == RoundPhase.FreezeTime)
                 Destroy(gameObject);
         }
 
