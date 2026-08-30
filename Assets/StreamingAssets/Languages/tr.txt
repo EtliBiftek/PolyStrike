@@ -2,9 +2,14 @@
 # Yeni bir dil eklemek için bu dosyayı kopyalayıp örneğin en.txt olarak çevirmen yeterli.
 
 prototype.title=PolyStrike - CS2 Hissi Prototipi
-prototype.controls=WASD: Hareket | Shift: Yürü | Space: Zıpla | Ctrl/C: Çömel | 1/2: Tüfek | 4: Utility Döngüsü | 6: HE | 7: Flash | 8: Smoke | 0: Molotof | Sol/Sağ/İkisi: Uzun/Kısa/Orta Atış | R: Şarjör Değiştir | Esc: İmleci Bırak
+prototype.controls=WASD: Hareket | Shift: Yürü | Space: Zıpla | Ctrl/C: Çömel | 1: Primary | 2: Tabanca | B: Satın Al | E: Plant/Defuse | 4: Utility | 6: HE | 7: Flash | 8: Smoke | 0: Molotof | R: Şarjör Değiştir
+
+team.t=T
+team.ct=CT
+
 hud.health=Can: {0}
 hud.armor=Zırh: {0}
+hud.money=${0}
 hud.ammo=Mermi: {0} / {1}
 hud.reloading=Şarjör değiştiriliyor...
 hud.deploying=Silah hazırlanıyor...
@@ -13,8 +18,31 @@ hud.velocity_modifier=Tag hızı: x{0:0.00}
 hud.inaccuracy=Sapma: {0:0.0000}
 hud.utility={0} x{1}
 hud.utility_throw=Atış: {0}
+hud.score=T {0}  -  {1} CT
+hud.round=Round {0}/{1}
+hud.bomb_timer=C4: {0:0.0}s
+hud.planting=C4 kuruluyor... %{0}
+hud.defusing=C4 çözülüyor... %{0}
+hud.round_winner={0} roundu kazandı - {1}
+
+match.phase.freeze=Freeze Time
+match.phase.live=Round Canlı
+match.phase.postplant=C4 Kurulu
+match.phase.round_end=Round Bitti
+match.phase.halftime=Devre Arası
+match.phase.match_end=Maç Bitti
+match.reason.elimination=Rakip takım elendi
+match.reason.time=Süre doldu
+match.reason.explosion=C4 patladı
+match.reason.defuse=C4 çözüldü
+match.draw=Maç 12-12 berabere bitti
+match.winner={0} maçı kazandı
+
 weapon.t_rifle=T Tüfeği
 weapon.ct_rifle=CT Tüfeği
+weapon.t_pistol=T Tabancası
+weapon.ct_pistol=CT Tabancası
+
 grenade.he=HE Bombası
 grenade.flash=Flashbang
 grenade.smoke=Sis Bombası
@@ -22,6 +50,26 @@ grenade.molotov=Molotof
 grenade.throw.full=Uzun
 grenade.throw.medium=Orta
 grenade.throw.short=Kısa
+
+buy.title=SATIN AL
+buy.money=${0}
+buy.primary_section=PRIMARY
+buy.equipment_section=EKİPMAN
+buy.utility_section=UTILITY
+buy.t_rifle=T Tüfeği
+buy.ct_rifle=CT Tüfeği
+buy.kevlar=Kevlar
+buy.helmet=Kevlar + Kask
+buy.defuse_kit=Defuse Kit
+buy.he=HE Bombası
+buy.flash=Flashbang
+buy.smoke=Sis Bombası
+buy.molotov=Molotof
+buy.item_price={0}  -  ${1}
+buy.item_count_price={0} x{1}  -  ${2}
+buy.item_owned={0}  -  ALINDI
+buy.close_hint=B veya Esc ile kapat
+
 menu.play=Oyna
 menu.settings=Ayarlar
 menu.exit=Çıkış
