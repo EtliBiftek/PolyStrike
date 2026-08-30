@@ -14,6 +14,8 @@ namespace PolyStrike.Player
         private const float JumpReleaseAfterWindow = 12f / 64f;
         private const float StandingJumpLatchVelocity = 218.86838f;
         private const float CrouchJumpLatchBonus = 3.125f;
+        private const int MaximumGrenades = 4;
+        private const int MaximumFlashbangs = 2;
 
         private PlayerLook playerLook;
         private PlayerMovement movement;
@@ -21,11 +23,12 @@ namespace PolyStrike.Player
         private ViewmodelMotion viewmodel;
         private AudioSource handlingSource;
 
-        private readonly int[] inventory = { 1, 1, 1, 1 };
+        private readonly int[] inventory = new int[4];
         private GrenadeType selectedType;
         private bool utilityEquipped;
         private bool primed;
         private bool throwPending;
+        private bool externalInputBlocked;
         private float armedStrength = 1f;
 
         private float observedJumpTime = -10f;
@@ -38,6 +41,7 @@ namespace PolyStrike.Player
         public bool IsPrimed => primed;
         public GrenadeType SelectedType => selectedType;
         public int SelectedCount => inventory[(int)selectedType];
+        public int TotalCount => inventory[0] + inventory[1] + inventory[2] + inventory[3];
         public float ThrowStrength => armedStrength;
 
         public void SetReferences(PlayerLook look, PlayerMovement playerMovement, HitscanWeapon hitscanWeapon, ViewmodelMotion viewmodelMotion)
@@ -46,6 +50,50 @@ namespace PolyStrike.Player
             movement = playerMovement;
             weapon = hitscanWeapon;
             viewmodel = viewmodelMotion;
+        }
+
+        public void SetExternalInputBlocked(bool blocked)
+        {
+            externalInputBlocked = blocked;
+            if (blocked && utilityEquipped && !throwPending)
+                UnequipUtility();
+        }
+
+        public bool CanBuy(GrenadeType type)
+        {
+            if (TotalCount >= MaximumGrenades)
+                return false;
+
+            var count = inventory[(int)type];
+            return type == GrenadeType.Flashbang ? count < MaximumFlashbangs : count < 1;
+        }
+
+        public bool AddGrenade(GrenadeType type)
+        {
+            if (!CanBuy(type))
+                return false;
+
+            inventory[(int)type]++;
+            return true;
+        }
+
+        public int GetCount(GrenadeType type)
+        {
+            return inventory[(int)type];
+        }
+
+        public void ResetForHalf()
+        {
+            ClearInventory();
+            ForceHolster();
+        }
+
+        public void ResetForRound(bool diedLastRound)
+        {
+            if (diedLastRound)
+                ClearInventory();
+
+            ForceHolster();
         }
 
         private void Awake()
@@ -59,6 +107,9 @@ namespace PolyStrike.Player
         private void Update()
         {
             UpdateJumpLatch();
+
+            if (externalInputBlocked)
+                return;
 
             // Release sonrası CS2 atışı tamamlar; bu kısa pencerede weapon switch throw'u iptal etmez.
             if (throwPending)
@@ -139,7 +190,6 @@ namespace PolyStrike.Player
                                           releaseTime <= jumpTime + JumpReleaseAfterWindow;
                 var latchTime = jumpTime + JumpLatchDelay;
 
-                // CS2 erken jump-throw'ları bir kez erteliyor; latch hazır olmadan live pose ile atmıyor.
                 if (releaseInJumpWindow && Time.time < latchTime)
                     yield return new WaitForSeconds(latchTime - Time.time);
 
@@ -293,6 +343,17 @@ namespace PolyStrike.Player
             CompleteThrow();
         }
 
+        private void ForceHolster()
+        {
+            StopAllCoroutines();
+            utilityEquipped = false;
+            primed = false;
+            throwPending = false;
+            weapon?.SetExternalInputBlocked(false);
+            movement?.ClearExternalMaxSpeed();
+            viewmodel?.SetUtilityMode(false);
+        }
+
         private void CompleteThrow()
         {
             utilityEquipped = false;
@@ -316,6 +377,12 @@ namespace PolyStrike.Player
                 Equip((GrenadeType)index);
                 return;
             }
+        }
+
+        private void ClearInventory()
+        {
+            for (var i = 0; i < inventory.Length; i++)
+                inventory[i] = 0;
         }
 
         private static float GetStrength(bool primary, bool secondary)
