@@ -1,3 +1,4 @@
+using PolyStrike.Match;
 using UnityEngine;
 
 namespace PolyStrike.Gameplay
@@ -11,6 +12,8 @@ namespace PolyStrike.Gameplay
         private Vector3 velocitySourceUnits;
         private Vector3 spinDegreesPerSecond;
         private Transform owner;
+        private MatchParticipant ownerParticipant;
+        private bool incendiary;
         private float accumulator;
         private float elapsed;
         private float nextSmokeThink;
@@ -20,13 +23,20 @@ namespace PolyStrike.Gameplay
         public GrenadeType Type => grenadeType;
         public Vector3 VelocitySourceUnits => velocitySourceUnits;
 
-        public void Initialize(GrenadeType type, Vector3 spawnPosition, Vector3 launchVelocitySourceUnits, Transform thrower)
+        public void Initialize(
+            GrenadeType type,
+            Vector3 spawnPosition,
+            Vector3 launchVelocitySourceUnits,
+            Transform thrower,
+            bool isIncendiary = false)
         {
             grenadeType = type;
             transform.position = spawnPosition;
             velocitySourceUnits = launchVelocitySourceUnits;
             spinDegreesPerSecond = new Vector3(600f, Random.Range(-1200f, 1200f), 0f);
             owner = thrower;
+            ownerParticipant = thrower != null ? thrower.GetComponent<MatchParticipant>() : null;
+            incendiary = isIncendiary;
             nextSmokeThink = GrenadeRules.SmokeArmTime;
         }
 
@@ -126,7 +136,16 @@ namespace PolyStrike.Gameplay
 
             if (hitPlayer)
             {
-                hitHealth.TakeDamage(hitHealth.Armor > 0f ? 1f : 2f);
+                var damage = hitHealth.Armor > 0f ? 1f : 2f;
+                var victim = hitHealth.GetComponent<MatchParticipant>();
+                if (ownerParticipant != null && victim != null && victim.Team == ownerParticipant.Team)
+                    damage *= 0.4f;
+
+                // Grenade impact has tiny integer damage; keep a non-zero friendly bump when it connects.
+                if (damage > 0f && damage < 1f)
+                    damage = 1f;
+
+                hitHealth.TakeDamage(damage);
             }
             else if (grenadeType == GrenadeType.Molotov)
             {
@@ -186,7 +205,7 @@ namespace PolyStrike.Gameplay
                 return;
 
             detonated = true;
-            GrenadeEffects.Detonate(grenadeType, transform.position);
+            GrenadeEffects.Detonate(grenadeType, transform.position, ownerParticipant, incendiary);
             Destroy(gameObject);
         }
 
