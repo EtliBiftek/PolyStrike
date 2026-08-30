@@ -10,10 +10,12 @@ namespace PolyStrike.Player
         [SerializeField] private float standingEyeHeight = 1.62f;
         [SerializeField] private float crouchingEyeHeight = 1.18f;
         [SerializeField] private float eyeTransitionSpeed = 8f;
-        [SerializeField] private float recoilReturnSpeed = 18f;
+        [SerializeField] private float recoilReturnDelay = 0.12f;
+        [SerializeField] private float recoilReturnSpeed = 7f;
 
         private PlayerMovement movement;
         private Vector2 cameraRecoil;
+        private float lastRecoilTime = -10f;
         private float pitch;
 
         public Quaternion AimRotation => Quaternion.Euler(pitch, transform.eulerAngles.y, 0f);
@@ -27,6 +29,7 @@ namespace PolyStrike.Player
         public void AddCameraRecoil(Vector2 recoilDelta)
         {
             cameraRecoil += recoilDelta;
+            lastRecoilTime = Time.time;
         }
 
         private void Awake()
@@ -63,7 +66,9 @@ namespace PolyStrike.Player
             pitch = Mathf.Clamp(pitch - delta.y, -89f, 89f);
             transform.Rotate(0f, delta.x, 0f, Space.Self);
 
-            cameraRecoil = Vector2.MoveTowards(cameraRecoil, Vector2.zero, recoilReturnSpeed * Time.deltaTime);
+            if (Time.time - lastRecoilTime >= recoilReturnDelay)
+                cameraRecoil = Vector2.MoveTowards(cameraRecoil, Vector2.zero, recoilReturnSpeed * Time.deltaTime);
+
             cameraTransform.localRotation = Quaternion.Euler(
                 pitch - cameraRecoil.y,
                 cameraRecoil.x,
