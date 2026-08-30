@@ -64,6 +64,12 @@ namespace PolyStrike.Match
         {
             Team = team;
             IsLocalPlayer = localPlayer;
+
+            if (GetComponent<BombDeathDropGuard>() == null)
+                gameObject.AddComponent<BombDeathDropGuard>();
+
+            if (localPlayer && GetComponent<PlayerDropController>() == null)
+                gameObject.AddComponent<PlayerDropController>();
         }
 
         public void SetLoadoutReferences(HitscanWeapon hitscanWeapon, UtilityController utilityController)
