@@ -1,0 +1,300 @@
+using System.Collections;
+using PolyStrike.Core;
+using PolyStrike.Gameplay;
+using UnityEngine;
+
+namespace PolyStrike.Player
+{
+    public sealed class UtilityController : MonoBehaviour
+    {
+        private PlayerLook playerLook;
+        private PlayerMovement movement;
+        private HitscanWeapon weapon;
+        private ViewmodelMotion viewmodel;
+
+        private readonly int[] inventory = { 1, 1, 1, 1 };
+        private GrenadeType selectedType;
+        private bool utilityEquipped;
+        private bool primed;
+        private bool throwPending;
+        private float armedStrength = 1f;
+
+        public bool IsEquipped => utilityEquipped;
+        public bool IsPrimed => primed;
+        public GrenadeType SelectedType => selectedType;
+        public int SelectedCount => inventory[(int)selectedType];
+        public float ThrowStrength => armedStrength;
+
+        public void SetReferences(PlayerLook look, PlayerMovement playerMovement, HitscanWeapon hitscanWeapon, ViewmodelMotion viewmodelMotion)
+        {
+            playerLook = look;
+            movement = playerMovement;
+            weapon = hitscanWeapon;
+            viewmodel = viewmodelMotion;
+        }
+
+        private void Update()
+        {
+            HandleSelection();
+
+            if (!utilityEquipped || throwPending || Cursor.lockState != CursorLockMode.Locked)
+                return;
+
+            UpdatePriming();
+        }
+
+        private void HandleSelection()
+        {
+            if (GameInput.Weapon1Pressed || GameInput.Weapon2Pressed)
+            {
+                UnequipUtility();
+                return;
+            }
+
+            if (GameInput.HeGrenadePressed)
+                Equip(GrenadeType.HighExplosive);
+            else if (GameInput.FlashbangPressed)
+                Equip(GrenadeType.Flashbang);
+            else if (GameInput.SmokePressed)
+                Equip(GrenadeType.Smoke);
+            else if (GameInput.MolotovPressed)
+                Equip(GrenadeType.Molotov);
+            else if (GameInput.UtilityPressed)
+                CycleUtility();
+        }
+
+        private void UpdatePriming()
+        {
+            var primary = GameInput.FireHeld;
+            var secondary = GameInput.SecondaryFireHeld;
+
+            if (!primed && (GameInput.FirePressed || GameInput.SecondaryFirePressed))
+            {
+                primed = true;
+                armedStrength = GetStrength(primary, secondary);
+            }
+
+            if (!primed)
+                return;
+
+            if (primary || secondary)
+                armedStrength = GetStrength(primary, secondary);
+
+            if (!GameInput.FireReleased && !GameInput.SecondaryFireReleased)
+                return;
+
+            var releasedStrength = armedStrength;
+            primed = false;
+            StartCoroutine(ThrowAfterConstructionDelay(releasedStrength));
+        }
+
+        private IEnumerator ThrowAfterConstructionDelay(float strength)
+        {
+            throwPending = true;
+
+            var launch = CaptureLaunch(strength);
+            yield return new WaitForSeconds(GrenadeRules.ThrowConstructionDelay);
+
+            if (!utilityEquipped || inventory[(int)selectedType] <= 0)
+            {
+                throwPending = false;
+                yield break;
+            }
+
+            SpawnProjectile(selectedType, launch.Position, launch.VelocitySourceUnits);
+            inventory[(int)selectedType]--;
+            throwPending = false;
+
+            if (inventory[(int)selectedType] > 0)
+            {
+                viewmodel?.PlayDeploy(0.72f);
+            }
+            else if (!TryEquipNextAvailable())
+            {
+                UnequipUtility();
+            }
+        }
+
+        private LaunchState CaptureLaunch(float strength)
+        {
+            var aimRotation = playerLook != null ? playerLook.AimRotation : transform.rotation;
+            var euler = aimRotation.eulerAngles;
+            var pitch = Mathf.DeltaAngle(0f, euler.x);
+            var adjustedPitch = GrenadeRules.AdjustThrowPitch(pitch);
+            var direction = Quaternion.Euler(adjustedPitch, euler.y, 0f) * Vector3.forward;
+
+            var eye = playerLook != null ? playerLook.AimOrigin : transform.position + Vector3.up * 1.6f;
+            eye += Vector3.down * SourceUnit.ToMeters((1f - strength) * 12f);
+
+            var forwardDistance = SourceUnit.ToMeters(22f);
+            var spawn = ResolveSpawnPoint(eye, direction, forwardDistance) - direction * SourceUnit.ToMeters(6f);
+            var inheritedVelocity = movement != null
+                ? SourceUnit.ToSourceUnits(movement.WorldVelocity) * GrenadeRules.PlayerVelocityInheritance
+                : Vector3.zero;
+            var launchVelocity = direction * GrenadeRules.GetThrowSpeed(strength) + inheritedVelocity;
+
+            return new LaunchState(spawn, launchVelocity);
+        }
+
+        private Vector3 ResolveSpawnPoint(Vector3 origin, Vector3 direction, float maxDistance)
+        {
+            var hits = Physics.SphereCastAll(
+                origin,
+                SourceUnit.ToMeters(GrenadeRules.ProjectileRadius),
+                direction,
+                maxDistance,
+                ~0,
+                QueryTriggerInteraction.Ignore);
+
+            var bestDistance = maxDistance;
+            for (var i = 0; i < hits.Length; i++)
+            {
+                var collider = hits[i].collider;
+                if (collider == null)
+                    continue;
+
+                var hitTransform = collider.transform;
+                if (hitTransform == transform || hitTransform.IsChildOf(transform))
+                    continue;
+
+                bestDistance = Mathf.Min(bestDistance, hits[i].distance);
+            }
+
+            return origin + direction * bestDistance;
+        }
+
+        private void SpawnProjectile(GrenadeType type, Vector3 position, Vector3 velocitySourceUnits)
+        {
+            var grenade = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            grenade.name = GetObjectName(type);
+            grenade.transform.position = position;
+            grenade.transform.localScale = Vector3.one * SourceUnit.ToMeters(4f);
+
+            var collider = grenade.GetComponent<Collider>();
+            if (collider != null)
+                Destroy(collider);
+
+            var renderer = grenade.GetComponent<Renderer>();
+            renderer.material = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"));
+            var color = GetColor(type);
+            if (renderer.material.HasProperty("_BaseColor"))
+                renderer.material.SetColor("_BaseColor", color);
+            else
+                renderer.material.color = color;
+
+            grenade.AddComponent<GrenadeProjectile>().Initialize(type, position, velocitySourceUnits, transform);
+        }
+
+        private void Equip(GrenadeType type)
+        {
+            if (inventory[(int)type] <= 0)
+                return;
+
+            selectedType = type;
+            utilityEquipped = true;
+            primed = false;
+            weapon?.SetExternalInputBlocked(true);
+            movement?.SetExternalMaxSpeed(GrenadeRules.EquippedMoveSpeed);
+            viewmodel?.SetUtilityMode(true, selectedType);
+            viewmodel?.PlayDeploy(0.72f);
+        }
+
+        private void UnequipUtility()
+        {
+            if (!utilityEquipped)
+                return;
+
+            utilityEquipped = false;
+            primed = false;
+            throwPending = false;
+            StopAllCoroutines();
+            weapon?.SetExternalInputBlocked(false);
+            movement?.ClearExternalMaxSpeed();
+            viewmodel?.SetUtilityMode(false);
+        }
+
+        private void CycleUtility()
+        {
+            var start = utilityEquipped ? (int)selectedType + 1 : 0;
+            for (var offset = 0; offset < inventory.Length; offset++)
+            {
+                var index = (start + offset) % inventory.Length;
+                if (inventory[index] <= 0)
+                    continue;
+
+                Equip((GrenadeType)index);
+                return;
+            }
+        }
+
+        private bool TryEquipNextAvailable()
+        {
+            for (var offset = 1; offset <= inventory.Length; offset++)
+            {
+                var index = ((int)selectedType + offset) % inventory.Length;
+                if (inventory[index] <= 0)
+                    continue;
+
+                Equip((GrenadeType)index);
+                return true;
+            }
+
+            return false;
+        }
+
+        private static float GetStrength(bool primary, bool secondary)
+        {
+            if (primary && secondary)
+                return 0.5f;
+            if (secondary)
+                return 0f;
+            return 1f;
+        }
+
+        private static Color GetColor(GrenadeType type)
+        {
+            switch (type)
+            {
+                case GrenadeType.HighExplosive:
+                    return new Color(0.22f, 0.28f, 0.16f);
+                case GrenadeType.Flashbang:
+                    return new Color(0.62f, 0.64f, 0.66f);
+                case GrenadeType.Smoke:
+                    return new Color(0.25f, 0.36f, 0.29f);
+                case GrenadeType.Molotov:
+                    return new Color(0.42f, 0.20f, 0.08f);
+                default:
+                    return Color.gray;
+            }
+        }
+
+        private static string GetObjectName(GrenadeType type)
+        {
+            switch (type)
+            {
+                case GrenadeType.HighExplosive:
+                    return "HE Projectile";
+                case GrenadeType.Flashbang:
+                    return "Flash Projectile";
+                case GrenadeType.Smoke:
+                    return "Smoke Projectile";
+                case GrenadeType.Molotov:
+                    return "Molotov Projectile";
+                default:
+                    return "Grenade Projectile";
+            }
+        }
+
+        private readonly struct LaunchState
+        {
+            public Vector3 Position { get; }
+            public Vector3 VelocitySourceUnits { get; }
+
+            public LaunchState(Vector3 position, Vector3 velocitySourceUnits)
+            {
+                Position = position;
+                VelocitySourceUnits = velocitySourceUnits;
+            }
+        }
+    }
+}
