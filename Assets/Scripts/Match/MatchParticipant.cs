@@ -14,6 +14,7 @@ namespace PolyStrike.Match
         private Health health;
         private HitscanWeapon weapon;
         private UtilityController utility;
+        private C4Controller c4;
         private Vector3 spawnPosition;
         private Quaternion spawnRotation;
 
@@ -220,6 +221,24 @@ namespace PolyStrike.Match
             return false;
         }
 
+        public bool TryPickupPrimary(int profileId, int magazine, int reserve)
+        {
+            if (weapon == null || !weapon.TryPickupPrimary(profileId, magazine, reserve))
+                return false;
+
+            EquipmentChanged?.Invoke();
+            return true;
+        }
+
+        public bool TryPickupGrenade(GrenadeType type)
+        {
+            if (utility == null || !utility.AddGrenade(type))
+                return false;
+
+            EquipmentChanged?.Invoke();
+            return true;
+        }
+
         public void GiveBomb(bool carriesBomb)
         {
             CarriesBomb = carriesBomb;
@@ -244,7 +263,44 @@ namespace PolyStrike.Match
 
         private void OnDeath()
         {
+            DropDeathEquipment();
             Died?.Invoke(this);
+        }
+
+        private void DropDeathEquipment()
+        {
+            c4 ??= GetComponent<C4Controller>();
+            if (CarriesBomb)
+                c4?.DropCarriedBomb(false);
+
+            var origin = transform.position + Vector3.up * 0.55f;
+            var baseVelocity = new Vector3(0f, SourceUnit.ToMeters(70f), 0f);
+
+            if (HasDefuseKit)
+            {
+                DroppedMatchItem.SpawnDefuseKit(origin + transform.right * 0.18f, baseVelocity + transform.right * 0.4f);
+                HasDefuseKit = false;
+            }
+
+            if (weapon != null && weapon.TryDropPrimary(out var profileId, out var magazine, out var reserve))
+            {
+                DroppedMatchItem.SpawnPrimaryRifle(
+                    origin - transform.right * 0.18f,
+                    baseVelocity + transform.forward * 0.6f,
+                    profileId,
+                    magazine,
+                    reserve);
+            }
+
+            if (utility != null && utility.TryTakeDeathDrop(Team, out var grenadeType))
+            {
+                DroppedMatchItem.SpawnGrenade(
+                    origin + transform.forward * 0.15f,
+                    baseVelocity - transform.right * 0.35f,
+                    grenadeType);
+            }
+
+            EquipmentChanged?.Invoke();
         }
     }
 }
