@@ -174,6 +174,18 @@ namespace PolyStrike.Core
             }
         }
 
+        public static bool DropPressed
+        {
+            get
+            {
+#if ENABLE_INPUT_SYSTEM
+                return Keyboard.current?.gKey.wasPressedThisFrame == true;
+#else
+                return Input.GetKeyDown(KeyCode.G);
+#endif
+            }
+        }
+
         public static bool ReloadPressed
         {
             get
