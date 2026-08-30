@@ -64,8 +64,13 @@ namespace PolyStrike.Gameplay
             if (armorSpent > 0)
                 ArmorChanged?.Invoke(Armor);
 
-            if (dealt > 0 && movement != null)
-                movement.ApplyTag(bullet.TaggingBaseVsM4);
+            if (dealt > 0)
+            {
+                if (movement == null)
+                    movement = GetComponent<PlayerMovement>();
+
+                movement?.ApplyTag(bullet.TaggingBaseVsM4);
+            }
 
             if (Current <= 0f)
                 Die();
