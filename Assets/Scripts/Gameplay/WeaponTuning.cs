@@ -35,7 +35,7 @@ namespace PolyStrike.Gameplay
             {
                 DisplayNameKey = "weapon.t_rifle",
                 Damage = 36f,
-                RangeMeters = 120f,
+                RangeMeters = SourceUnit.ToMeters(8192f),
                 RangeModifier = 0.98f,
                 ArmorPenetration = 0.775f,
                 PenetrationPower = 2f,
@@ -74,7 +74,7 @@ namespace PolyStrike.Gameplay
             {
                 DisplayNameKey = "weapon.ct_rifle",
                 Damage = 33f,
-                RangeMeters = 120f,
+                RangeMeters = SourceUnit.ToMeters(8192f),
                 RangeModifier = 0.97f,
                 ArmorPenetration = 0.70f,
                 PenetrationPower = 2f,
