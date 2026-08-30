@@ -151,6 +151,34 @@ namespace PolyStrike.Gameplay
             }
         }
 
+        public static void ShockwaveExtinguish(Vector3 center, float radiusMeters)
+        {
+            if (radiusMeters <= 0f)
+                return;
+
+            var radiusSquared = radiusMeters * radiusMeters;
+            for (var i = Active.Count - 1; i >= 0; i--)
+            {
+                var inferno = Active[i];
+                if (inferno == null)
+                    continue;
+
+                if (inferno.IsTouchedByShockwave(center, radiusSquared))
+                    Destroy(inferno.gameObject);
+            }
+        }
+
+        private bool IsTouchedByShockwave(Vector3 center, float radiusSquared)
+        {
+            for (var i = 0; i < flamePositions.Count; i++)
+            {
+                if ((flamePositions[i] - center).sqrMagnitude <= radiusSquared)
+                    return true;
+            }
+
+            return false;
+        }
+
         private float GetSmokeCoverage(SmokeCloud smoke)
         {
             var covered = 0;
