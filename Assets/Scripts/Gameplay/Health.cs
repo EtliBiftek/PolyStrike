@@ -7,7 +7,7 @@ namespace PolyStrike.Gameplay
     public sealed class Health : MonoBehaviour
     {
         private const float ArmorBonus = 0.5f;
-        private const float HeArmorRatio = 0.575f;
+        private const float HeArmorRatio = 0.60f;
 
         [SerializeField] private float maxHealth = 100f;
         [SerializeField] private float startingArmor = 100f;
