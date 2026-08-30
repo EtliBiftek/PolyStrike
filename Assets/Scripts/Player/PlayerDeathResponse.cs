@@ -11,7 +11,10 @@ namespace PolyStrike.Player
         private PlayerMovement movement;
         private PlayerLook look;
         private HitscanWeapon weapon;
+        private UtilityController utility;
         private Camera playerCamera;
+        private Vector3 cameraStartPosition;
+        private Quaternion cameraStartRotation;
 
         private void Awake()
         {
@@ -19,11 +22,17 @@ namespace PolyStrike.Player
             movement = GetComponent<PlayerMovement>();
             look = GetComponent<PlayerLook>();
             health.Died += OnDeath;
+            health.RoundReset += OnRoundReset;
         }
 
         public void SetCamera(Camera cameraToUse)
         {
             playerCamera = cameraToUse;
+            if (playerCamera == null)
+                return;
+
+            cameraStartPosition = playerCamera.transform.localPosition;
+            cameraStartRotation = playerCamera.transform.localRotation;
         }
 
         public void SetWeapon(HitscanWeapon weaponToUse)
@@ -31,10 +40,18 @@ namespace PolyStrike.Player
             weapon = weaponToUse;
         }
 
+        public void SetUtility(UtilityController utilityToUse)
+        {
+            utility = utilityToUse;
+        }
+
         private void OnDestroy()
         {
-            if (health != null)
-                health.Died -= OnDeath;
+            if (health == null)
+                return;
+
+            health.Died -= OnDeath;
+            health.RoundReset -= OnRoundReset;
         }
 
         private void OnDeath()
@@ -45,8 +62,33 @@ namespace PolyStrike.Player
                 look.enabled = false;
             if (weapon != null)
                 weapon.enabled = false;
+            if (utility != null)
+                utility.enabled = false;
 
             StartCoroutine(PlayDeathView());
+        }
+
+        private void OnRoundReset()
+        {
+            StopAllCoroutines();
+
+            if (playerCamera != null)
+            {
+                playerCamera.transform.localPosition = cameraStartPosition;
+                playerCamera.transform.localRotation = cameraStartRotation;
+            }
+
+            if (movement != null)
+            {
+                movement.enabled = true;
+                movement.ResetRoundMotion();
+            }
+            if (look != null)
+                look.enabled = true;
+            if (weapon != null)
+                weapon.enabled = true;
+            if (utility != null)
+                utility.enabled = true;
         }
 
         private IEnumerator PlayDeathView()
