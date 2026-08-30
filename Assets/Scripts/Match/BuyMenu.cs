@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using PolyStrike.Core;
 using PolyStrike.Gameplay;
 using PolyStrike.Player;
@@ -8,9 +9,31 @@ namespace PolyStrike.Match
     [RequireComponent(typeof(MatchParticipant))]
     public sealed class BuyMenu : MonoBehaviour
     {
+        private enum PurchaseKind
+        {
+            Primary,
+            Armor,
+            DefuseKit,
+            Grenade
+        }
+
+        private sealed class PurchaseRecord
+        {
+            public PurchaseKind Kind;
+            public int Price;
+            public GrenadeType GrenadeType;
+            public int GrenadeCountBefore;
+            public float ArmorBefore;
+            public bool HelmetBefore;
+            public float ArmorAfter;
+            public bool HelmetAfter;
+        }
+
         private MatchParticipant participant;
         private HitscanWeapon weapon;
         private UtilityController utility;
+        private readonly List<PurchaseRecord> purchases = new List<PurchaseRecord>();
+        private int observedRound = -1;
         private bool open;
         private GUIStyle titleStyle;
         private GUIStyle moneyStyle;
@@ -27,6 +50,12 @@ namespace PolyStrike.Match
         private void Update()
         {
             var match = MatchRoundManager.Instance;
+            if (match != null && match.RoundNumber != observedRound)
+            {
+                observedRound = match.RoundNumber;
+                purchases.Clear();
+            }
+
             var canBuy = match != null && match.BuyAllowed && participant.IsInBuyZone() && participant.IsAlive;
 
             if (open && (!canBuy || GameInput.EscapePressed))
@@ -58,7 +87,7 @@ namespace PolyStrike.Match
             EnsureStyles();
 
             var width = Mathf.Min(720f, Screen.width - 80f);
-            var height = Mathf.Min(600f, Screen.height - 80f);
+            var height = Mathf.Min(650f, Screen.height - 80f);
             var rect = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
 
             GUI.Box(rect, GUIContent.none);
@@ -72,21 +101,15 @@ namespace PolyStrike.Match
 
             GUILayout.Space(18f);
             GUILayout.Label(Localization.Get("buy.primary_section"));
-            DrawBuyButton(
-                participant.Team == MatchTeam.Terrorists ? "buy.t_rifle" : "buy.ct_rifle",
-                participant.Team == MatchTeam.Terrorists ? MatchRules.TRiflePrice : MatchRules.CTRiflePrice,
-                participant.BuyPrimaryRifle,
-                weapon != null && weapon.HasPrimary);
+            DrawPrimaryButton();
 
             GUILayout.Space(14f);
             GUILayout.Label(Localization.Get("buy.equipment_section"));
-            DrawBuyButton("buy.kevlar", MatchRules.KevlarPrice, participant.BuyKevlar, participant.Health.Armor >= 100f);
-
-            var helmetPrice = participant.Health.Armor >= 100f && !participant.Health.HasHelmet ? 350 : MatchRules.HelmetBundlePrice;
-            DrawBuyButton("buy.helmet", helmetPrice, participant.BuyHelmetBundle, participant.Health.Armor >= 100f && participant.Health.HasHelmet);
+            DrawKevlarButton();
+            DrawHelmetButton();
 
             if (participant.Team == MatchTeam.CounterTerrorists)
-                DrawBuyButton("buy.defuse_kit", MatchRules.DefuseKitPrice, participant.BuyDefuseKit, participant.HasDefuseKit);
+                DrawDefuseKitButton();
 
             GUILayout.Space(14f);
             GUILayout.Label(Localization.Get("buy.utility_section"));
@@ -98,9 +121,105 @@ namespace PolyStrike.Match
             var firePrice = participant.Team == MatchTeam.Terrorists ? MatchRules.MolotovPrice : MatchRules.IncendiaryPrice;
             DrawGrenadeButton(GrenadeType.Molotov, fireKey, firePrice);
 
+            GUILayout.Space(14f);
+            if (TryGetRefundablePurchase(out var refundable, out var recordIndex))
+            {
+                if (GUILayout.Button(string.Format(Localization.Get("buy.refund"), refundable.Price), GUILayout.Height(38f)))
+                    RefundPurchase(refundable, recordIndex);
+            }
+
             GUILayout.FlexibleSpace();
             GUILayout.Label(Localization.Get("buy.close_hint"));
             GUILayout.EndArea();
+        }
+
+        private void DrawPrimaryButton()
+        {
+            var key = participant.Team == MatchTeam.Terrorists ? "buy.t_rifle" : "buy.ct_rifle";
+            var price = participant.Team == MatchTeam.Terrorists ? MatchRules.TRiflePrice : MatchRules.CTRiflePrice;
+            var name = Localization.Get(key);
+            var owned = weapon != null && weapon.HasPrimary;
+            var label = owned
+                ? string.Format(Localization.Get("buy.item_owned"), name)
+                : string.Format(Localization.Get("buy.item_price"), name, price);
+
+            GUI.enabled = !owned && participant.Money >= price;
+            if (GUILayout.Button(label, GUILayout.Height(38f)) && participant.BuyPrimaryRifle())
+            {
+                purchases.Add(new PurchaseRecord
+                {
+                    Kind = PurchaseKind.Primary,
+                    Price = price
+                });
+            }
+            GUI.enabled = true;
+        }
+
+        private void DrawKevlarButton()
+        {
+            var owned = participant.Health.Armor >= 100f;
+            var name = Localization.Get("buy.kevlar");
+            var label = owned
+                ? string.Format(Localization.Get("buy.item_owned"), name)
+                : string.Format(Localization.Get("buy.item_price"), name, MatchRules.KevlarPrice);
+
+            GUI.enabled = !owned && participant.Money >= MatchRules.KevlarPrice;
+            if (GUILayout.Button(label, GUILayout.Height(38f)))
+                TryBuyArmor(false, MatchRules.KevlarPrice);
+            GUI.enabled = true;
+        }
+
+        private void DrawHelmetButton()
+        {
+            var owned = participant.Health.Armor >= 100f && participant.Health.HasHelmet;
+            var price = participant.Health.Armor >= 100f && !participant.Health.HasHelmet ? 350 : MatchRules.HelmetBundlePrice;
+            var name = Localization.Get("buy.helmet");
+            var label = owned
+                ? string.Format(Localization.Get("buy.item_owned"), name)
+                : string.Format(Localization.Get("buy.item_price"), name, price);
+
+            GUI.enabled = !owned && participant.Money >= price;
+            if (GUILayout.Button(label, GUILayout.Height(38f)))
+                TryBuyArmor(true, price);
+            GUI.enabled = true;
+        }
+
+        private void TryBuyArmor(bool helmet, int price)
+        {
+            var beforeArmor = participant.Health.Armor;
+            var beforeHelmet = participant.Health.HasHelmet;
+            var purchased = helmet ? participant.BuyHelmetBundle() : participant.BuyKevlar();
+            if (!purchased)
+                return;
+
+            purchases.Add(new PurchaseRecord
+            {
+                Kind = PurchaseKind.Armor,
+                Price = price,
+                ArmorBefore = beforeArmor,
+                HelmetBefore = beforeHelmet,
+                ArmorAfter = participant.Health.Armor,
+                HelmetAfter = participant.Health.HasHelmet
+            });
+        }
+
+        private void DrawDefuseKitButton()
+        {
+            var name = Localization.Get("buy.defuse_kit");
+            var label = participant.HasDefuseKit
+                ? string.Format(Localization.Get("buy.item_owned"), name)
+                : string.Format(Localization.Get("buy.item_price"), name, MatchRules.DefuseKitPrice);
+
+            GUI.enabled = !participant.HasDefuseKit && participant.Money >= MatchRules.DefuseKitPrice;
+            if (GUILayout.Button(label, GUILayout.Height(38f)) && participant.BuyDefuseKit())
+            {
+                purchases.Add(new PurchaseRecord
+                {
+                    Kind = PurchaseKind.DefuseKit,
+                    Price = MatchRules.DefuseKitPrice
+                });
+            }
+            GUI.enabled = true;
         }
 
         private void DrawGrenadeButton(GrenadeType type, string localizationKey, int price)
@@ -113,22 +232,94 @@ namespace PolyStrike.Match
             var available = utility != null && utility.CanBuy(type) && participant.Money >= price;
 
             GUI.enabled = available;
-            if (GUILayout.Button(label, GUILayout.Height(38f)))
-                participant.BuyGrenade(type);
+            if (GUILayout.Button(label, GUILayout.Height(38f)) && participant.BuyGrenade(type))
+            {
+                purchases.Add(new PurchaseRecord
+                {
+                    Kind = PurchaseKind.Grenade,
+                    Price = price,
+                    GrenadeType = type,
+                    GrenadeCountBefore = count
+                });
+            }
             GUI.enabled = true;
         }
 
-        private void DrawBuyButton(string localizationKey, int price, System.Func<bool> buy, bool owned)
+        private bool TryGetRefundablePurchase(out PurchaseRecord record, out int index)
         {
-            var name = Localization.Get(localizationKey);
-            var label = owned
-                ? string.Format(Localization.Get("buy.item_owned"), name)
-                : string.Format(Localization.Get("buy.item_price"), name, price);
+            for (var i = purchases.Count - 1; i >= 0; i--)
+            {
+                if (!CanRefund(purchases[i]))
+                    continue;
 
-            GUI.enabled = !owned && participant.Money >= price;
-            if (GUILayout.Button(label, GUILayout.Height(38f)))
-                buy();
-            GUI.enabled = true;
+                record = purchases[i];
+                index = i;
+                return true;
+            }
+
+            record = null;
+            index = -1;
+            return false;
+        }
+
+        private bool CanRefund(PurchaseRecord record)
+        {
+            switch (record.Kind)
+            {
+                case PurchaseKind.Primary:
+                    return weapon != null && weapon.CanRefundPrimary();
+
+                case PurchaseKind.Armor:
+                    return Mathf.Approximately(participant.Health.Armor, record.ArmorAfter) &&
+                           participant.Health.HasHelmet == record.HelmetAfter;
+
+                case PurchaseKind.DefuseKit:
+                    return participant.HasDefuseKit;
+
+                case PurchaseKind.Grenade:
+                    return utility != null && utility.GetCount(record.GrenadeType) > record.GrenadeCountBefore;
+
+                default:
+                    return false;
+            }
+        }
+
+        private void RefundPurchase(PurchaseRecord record, int index)
+        {
+            var refunded = false;
+
+            switch (record.Kind)
+            {
+                case PurchaseKind.Primary:
+                    refunded = weapon != null && weapon.RefundPrimary();
+                    break;
+
+                case PurchaseKind.Armor:
+                    if (CanRefund(record))
+                    {
+                        participant.Health.SetEquipment(record.ArmorBefore, record.HelmetBefore);
+                        refunded = true;
+                    }
+                    break;
+
+                case PurchaseKind.DefuseKit:
+                    if (participant.HasDefuseKit)
+                    {
+                        participant.SetDefuseKit(false);
+                        refunded = true;
+                    }
+                    break;
+
+                case PurchaseKind.Grenade:
+                    refunded = utility != null && utility.RefundGrenade(record.GrenadeType, record.GrenadeCountBefore);
+                    break;
+            }
+
+            if (!refunded)
+                return;
+
+            participant.AddMoney(record.Price);
+            purchases.RemoveAt(index);
         }
 
         private void SetOpen(bool value)
