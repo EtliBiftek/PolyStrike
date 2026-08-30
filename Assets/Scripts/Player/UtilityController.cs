@@ -8,6 +8,11 @@ namespace PolyStrike.Player
 {
     public sealed class UtilityController : MonoBehaviour
     {
+        private const float JumpLatchDelay = 0.10f;
+        private const float JumpLatchMaxAge = 0.20f;
+        private const float JumpReleaseBeforeWindow = 6f / 64f;
+        private const float JumpReleaseAfterWindow = 12f / 64f;
+
         private PlayerLook playerLook;
         private PlayerMovement movement;
         private HitscanWeapon weapon;
@@ -20,6 +25,12 @@ namespace PolyStrike.Player
         private bool primed;
         private bool throwPending;
         private float armedStrength = 1f;
+
+        private float observedJumpTime = -10f;
+        private float pendingJumpLatchTime = -1f;
+        private float jumpLatchCapturedAt = -10f;
+        private ThrowPose jumpLatch;
+        private bool hasJumpLatch;
 
         public bool IsEquipped => utilityEquipped;
         public bool IsPrimed => primed;
@@ -45,6 +56,8 @@ namespace PolyStrike.Player
 
         private void Update()
         {
+            UpdateJumpLatch();
+
             // Release sonrası CS2 atışı tamamlar; bu kısa pencerede weapon switch throw'u iptal etmez.
             if (throwPending)
                 return;
@@ -100,15 +113,15 @@ namespace PolyStrike.Player
 
             var type = selectedType;
             var strength = armedStrength;
+            var releaseTime = Time.time;
             primed = false;
             handlingSource.PlayOneShot(UtilitySfxBank.Throw(type), 0.72f);
-            StartCoroutine(ThrowAfterConstructionDelay(type, strength));
+            StartCoroutine(ThrowAfterConstructionDelay(type, strength, releaseTime));
         }
 
-        private IEnumerator ThrowAfterConstructionDelay(GrenadeType type, float strength)
+        private IEnumerator ThrowAfterConstructionDelay(GrenadeType type, float strength, float releaseTime)
         {
             throwPending = true;
-            var launch = CaptureLaunch(strength);
             yield return new WaitForSeconds(GrenadeRules.ThrowConstructionDelay);
 
             if (!utilityEquipped || inventory[(int)type] <= 0)
@@ -117,27 +130,62 @@ namespace PolyStrike.Player
                 yield break;
             }
 
+            var pose = ResolveConstructionPose(releaseTime);
+            var launch = BuildLaunch(strength, pose);
             SpawnProjectile(type, launch.Position, launch.VelocitySourceUnits);
             inventory[(int)type]--;
             CompleteThrow();
         }
 
-        private LaunchState CaptureLaunch(float strength)
+        private void UpdateJumpLatch()
         {
-            var aimRotation = playerLook != null ? playerLook.AimRotation : transform.rotation;
-            var euler = aimRotation.eulerAngles;
+            if (movement == null)
+                return;
+
+            if (!Mathf.Approximately(observedJumpTime, movement.LastJumpTime))
+            {
+                observedJumpTime = movement.LastJumpTime;
+                pendingJumpLatchTime = observedJumpTime + JumpLatchDelay;
+                hasJumpLatch = false;
+            }
+
+            if (pendingJumpLatchTime < 0f || Time.time < pendingJumpLatchTime)
+                return;
+
+            jumpLatch = CapturePose();
+            jumpLatchCapturedAt = Time.time;
+            pendingJumpLatchTime = -1f;
+            hasJumpLatch = true;
+        }
+
+        private ThrowPose ResolveConstructionPose(float releaseTime)
+        {
+            var releaseInJumpWindow = releaseTime >= observedJumpTime - JumpReleaseBeforeWindow &&
+                                      releaseTime <= observedJumpTime + JumpReleaseAfterWindow;
+            var latchFresh = hasJumpLatch && Time.time - jumpLatchCapturedAt <= JumpLatchMaxAge;
+
+            return releaseInJumpWindow && latchFresh ? jumpLatch : CapturePose();
+        }
+
+        private ThrowPose CapturePose()
+        {
+            var rotation = playerLook != null ? playerLook.AimRotation : transform.rotation;
+            var eye = playerLook != null ? playerLook.AimOrigin : transform.position + Vector3.up * 1.6f;
+            var velocity = movement != null ? movement.WorldVelocity : Vector3.zero;
+            return new ThrowPose(eye, rotation, velocity);
+        }
+
+        private LaunchState BuildLaunch(float strength, ThrowPose pose)
+        {
+            var euler = pose.Rotation.eulerAngles;
             var pitch = Mathf.DeltaAngle(0f, euler.x);
             var adjustedPitch = GrenadeRules.AdjustThrowPitch(pitch);
             var direction = Quaternion.Euler(adjustedPitch, euler.y, 0f) * Vector3.forward;
 
-            var eye = playerLook != null ? playerLook.AimOrigin : transform.position + Vector3.up * 1.6f;
-            eye += Vector3.down * SourceUnit.ToMeters((1f - strength) * 12f);
-
+            var origin = pose.EyePosition + Vector3.down * SourceUnit.ToMeters((1f - strength) * 12f);
             var forwardDistance = SourceUnit.ToMeters(22f);
-            var spawn = ResolveSpawnPoint(eye, direction, forwardDistance) - direction * SourceUnit.ToMeters(6f);
-            var inheritedVelocity = movement != null
-                ? SourceUnit.ToSourceUnits(movement.WorldVelocity) * GrenadeRules.PlayerVelocityInheritance
-                : Vector3.zero;
+            var spawn = ResolveSpawnPoint(origin, direction, forwardDistance) - direction * SourceUnit.ToMeters(6f);
+            var inheritedVelocity = SourceUnit.ToSourceUnits(pose.WorldVelocity) * GrenadeRules.PlayerVelocityInheritance;
             var launchVelocity = direction * GrenadeRules.GetThrowSpeed(strength) + inheritedVelocity;
 
             return new LaunchState(spawn, launchVelocity);
@@ -182,7 +230,10 @@ namespace PolyStrike.Player
                 Destroy(collider);
 
             var renderer = grenade.GetComponent<Renderer>();
-            renderer.material = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"));
+            var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            if (shader != null)
+                renderer.material = new Material(shader);
+
             var color = GetColor(type);
             if (renderer.material.HasProperty("_BaseColor"))
                 renderer.material.SetColor("_BaseColor", color);
@@ -281,6 +332,20 @@ namespace PolyStrike.Player
                     return "Molotov Projectile";
                 default:
                     return "Grenade Projectile";
+            }
+        }
+
+        private readonly struct ThrowPose
+        {
+            public Vector3 EyePosition { get; }
+            public Quaternion Rotation { get; }
+            public Vector3 WorldVelocity { get; }
+
+            public ThrowPose(Vector3 eyePosition, Quaternion rotation, Vector3 worldVelocity)
+            {
+                EyePosition = eyePosition;
+                Rotation = rotation;
+                WorldVelocity = worldVelocity;
             }
         }
 
