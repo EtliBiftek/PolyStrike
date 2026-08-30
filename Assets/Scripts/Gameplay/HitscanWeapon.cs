@@ -28,7 +28,7 @@ namespace PolyStrike.Gameplay
         public int AmmoInMagazine => magazineAmmo[activeProfileIndex];
         public int ReserveAmmo => reserveAmmo[activeProfileIndex];
         public bool IsReloading => isReloading;
-        public string DisplayName => Profile.DisplayName;
+        public string DisplayName => Localization.Get(Profile.DisplayNameKey);
         public float MaxMoveSpeedSourceUnits => Profile.MaxMoveSpeedSourceUnits;
         public float CurrentInaccuracy { get; private set; }
 
