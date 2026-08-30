@@ -26,6 +26,7 @@ namespace PolyStrike.Player
         private AudioSource handlingSource;
 
         private readonly int[] inventory = new int[4];
+        private readonly int[] refundableInventory = new int[4];
         private GrenadeType selectedType;
         private bool utilityEquipped;
         private bool primed;
@@ -70,22 +71,27 @@ namespace PolyStrike.Player
             return type == GrenadeType.Flashbang ? count < MaximumFlashbangs : count < 1;
         }
 
-        public bool AddGrenade(GrenadeType type)
+        public bool AddGrenade(GrenadeType type, bool refundable = false)
         {
             if (!CanBuy(type))
                 return false;
 
-            inventory[(int)type]++;
+            var index = (int)type;
+            inventory[index]++;
+            if (refundable)
+                refundableInventory[index]++;
             return true;
         }
 
         public bool RefundGrenade(GrenadeType type, int countBeforePurchase)
         {
             var index = (int)type;
-            if (index < 0 || index >= inventory.Length || inventory[index] <= countBeforePurchase)
+            if (index < 0 || index >= inventory.Length ||
+                inventory[index] <= countBeforePurchase || refundableInventory[index] <= 0)
                 return false;
 
             inventory[index]--;
+            refundableInventory[index]--;
             if (utilityEquipped && selectedType == type && inventory[index] <= 0)
                 ForceHolster();
             return true;
@@ -97,7 +103,7 @@ namespace PolyStrike.Player
             if (!utilityEquipped || primed || throwPending || inventory[(int)selectedType] <= 0)
                 return false;
 
-            inventory[(int)selectedType]--;
+            ConsumeOne(selectedType);
             ForceHolster();
             return true;
         }
@@ -107,14 +113,18 @@ namespace PolyStrike.Player
             if (utilityEquipped && inventory[(int)selectedType] > 0)
             {
                 type = selectedType;
-                inventory[(int)type]--;
+                ConsumeOne(type);
                 ForceHolster();
                 return true;
             }
 
-            var order = team == MatchTeam.CounterTerrorists
-                ? new[] { GrenadeType.Molotov, GrenadeType.Smoke, GrenadeType.HighExplosive, GrenadeType.Flashbang }
-                : new[] { GrenadeType.Molotov, GrenadeType.Smoke, GrenadeType.HighExplosive, GrenadeType.Flashbang };
+            var order = new[]
+            {
+                GrenadeType.Molotov,
+                GrenadeType.Smoke,
+                GrenadeType.HighExplosive,
+                GrenadeType.Flashbang
+            };
 
             for (var i = 0; i < order.Length; i++)
             {
@@ -122,7 +132,7 @@ namespace PolyStrike.Player
                 if (inventory[(int)candidate] <= 0)
                     continue;
 
-                inventory[(int)candidate]--;
+                ConsumeOne(candidate);
                 type = candidate;
                 ForceHolster();
                 return true;
@@ -147,6 +157,9 @@ namespace PolyStrike.Player
         {
             if (diedLastRound)
                 ClearInventory();
+
+            for (var i = 0; i < refundableInventory.Length; i++)
+                refundableInventory[i] = 0;
 
             ForceHolster();
         }
@@ -254,7 +267,7 @@ namespace PolyStrike.Player
             var pose = ResolveConstructionPose(releaseTime);
             var launch = BuildLaunch(strength, pose);
             SpawnProjectile(type, launch.Position, launch.VelocitySourceUnits);
-            inventory[(int)type]--;
+            ConsumeOne(type);
             CompleteThrow();
         }
 
@@ -435,10 +448,24 @@ namespace PolyStrike.Player
             }
         }
 
+        private void ConsumeOne(GrenadeType type)
+        {
+            var index = (int)type;
+            if (inventory[index] <= 0)
+                return;
+
+            inventory[index]--;
+            if (refundableInventory[index] > 0)
+                refundableInventory[index]--;
+        }
+
         private void ClearInventory()
         {
             for (var i = 0; i < inventory.Length; i++)
+            {
                 inventory[i] = 0;
+                refundableInventory[i] = 0;
+            }
         }
 
         private static float GetStrength(bool primary, bool secondary)
