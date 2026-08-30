@@ -66,6 +66,18 @@ namespace PolyStrike.Core
             }
         }
 
+        public static bool WalkHeld
+        {
+            get
+            {
+#if ENABLE_INPUT_SYSTEM
+                return Keyboard.current?.leftShiftKey.isPressed == true;
+#else
+                return Input.GetKey(KeyCode.LeftShift);
+#endif
+            }
+        }
+
         public static bool FireHeld
         {
             get
@@ -98,6 +110,30 @@ namespace PolyStrike.Core
                 return Keyboard.current?.rKey.wasPressedThisFrame == true;
 #else
                 return Input.GetKeyDown(KeyCode.R);
+#endif
+            }
+        }
+
+        public static bool Weapon1Pressed
+        {
+            get
+            {
+#if ENABLE_INPUT_SYSTEM
+                return Keyboard.current?.digit1Key.wasPressedThisFrame == true;
+#else
+                return Input.GetKeyDown(KeyCode.Alpha1);
+#endif
+            }
+        }
+
+        public static bool Weapon2Pressed
+        {
+            get
+            {
+#if ENABLE_INPUT_SYSTEM
+                return Keyboard.current?.digit2Key.wasPressedThisFrame == true;
+#else
+                return Input.GetKeyDown(KeyCode.Alpha2);
 #endif
             }
         }
