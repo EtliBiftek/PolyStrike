@@ -15,6 +15,7 @@ namespace PolyStrike.Gameplay
         private Camera shotCamera;
         private PlayerLook playerLook;
         private PlayerMovement movement;
+        private ViewmodelMotion viewmodel;
         private WeaponTuning[] profiles;
         private int[] magazineAmmo;
         private int[] reserveAmmo;
@@ -23,6 +24,7 @@ namespace PolyStrike.Gameplay
         private int sprayIndex;
         private float accuracyPenalty;
         private float nextShotTime;
+        private float deployUntil;
         private float lastShotTime = -10f;
         private bool isReloading;
 
@@ -31,15 +33,17 @@ namespace PolyStrike.Gameplay
         public int AmmoInMagazine => magazineAmmo[activeProfileIndex];
         public int ReserveAmmo => reserveAmmo[activeProfileIndex];
         public bool IsReloading => isReloading;
+        public bool IsDeploying => Time.time < deployUntil;
         public string DisplayName => Localization.Get(Profile.DisplayNameKey);
         public float MaxMoveSpeedSourceUnits => Profile.MaxMoveSpeedSourceUnits;
         public float CurrentInaccuracy { get; private set; }
 
-        public void SetReferences(Camera cameraToUse, PlayerLook look, PlayerMovement playerMovement)
+        public void SetReferences(Camera cameraToUse, PlayerLook look, PlayerMovement playerMovement, ViewmodelMotion viewmodelMotion)
         {
             shotCamera = cameraToUse;
             playerLook = look;
             movement = playerMovement;
+            viewmodel = viewmodelMotion;
         }
 
         private void Awake()
@@ -58,6 +62,13 @@ namespace PolyStrike.Gameplay
                 magazineAmmo[i] = profiles[i].MagazineSize;
                 reserveAmmo[i] = profiles[i].ReserveAmmo;
             }
+        }
+
+        private void Start()
+        {
+            deployUntil = Time.time + Profile.DeployTime;
+            nextShotTime = deployUntil;
+            viewmodel?.PlayDeploy(Profile.DeployTime);
         }
 
         private void Update()
@@ -84,7 +95,7 @@ namespace PolyStrike.Gameplay
 
         private void TryFire()
         {
-            if (isReloading || shotCamera == null || Time.time < nextShotTime)
+            if (isReloading || IsDeploying || shotCamera == null || Time.time < nextShotTime)
                 return;
 
             if (AmmoInMagazine <= 0)
@@ -104,6 +115,7 @@ namespace PolyStrike.Gameplay
             var recoilStep = recoilPoint - previousPoint;
 
             playerLook?.AddCameraRecoil(recoilStep * 0.68f);
+            viewmodel?.PlayShot(recoilStep);
 
             CurrentInaccuracy = CalculateCurrentInaccuracy();
             var direction = BuildShotDirection(recoilPoint, CurrentInaccuracy);
@@ -134,22 +146,30 @@ namespace PolyStrike.Gameplay
                 var hitbox = hit.collider.GetComponent<PlayerHitbox>();
                 if (hitbox != null && hitbox.Health != null)
                 {
-                    hitbox.Health.TakeBulletDamage(new BulletDamage(
+                    var result = hitbox.Health.TakeBulletDamage(new BulletDamage(
                         currentDamage,
                         Profile.ArmorPenetration,
                         Profile.TaggingBaseVsM4,
-                        hitbox.HitGroup));
+                        hitbox.HitGroup,
+                        direction));
+
+                    if (!result.Killed)
+                        hit.collider.GetComponent<HitReaction>()?.React(direction, result.HealthDamage);
                     return;
                 }
 
                 var health = hit.collider.GetComponentInParent<Health>();
                 if (health != null)
                 {
-                    health.TakeBulletDamage(new BulletDamage(
+                    var result = health.TakeBulletDamage(new BulletDamage(
                         currentDamage,
                         Profile.ArmorPenetration,
                         Profile.TaggingBaseVsM4,
-                        HitGroup.Chest));
+                        HitGroup.Chest,
+                        direction));
+
+                    if (!result.Killed)
+                        hit.collider.GetComponent<HitReaction>()?.React(direction, result.HealthDamage);
                     return;
                 }
 
@@ -269,12 +289,15 @@ namespace PolyStrike.Gameplay
             activeProfileIndex = index;
             sprayIndex = 0;
             accuracyPenalty = 0f;
-            nextShotTime = Time.time + 0.2f;
+
+            deployUntil = Time.time + Profile.DeployTime;
+            nextShotTime = deployUntil;
+            viewmodel?.PlayDeploy(Profile.DeployTime);
         }
 
         private void TryStartReload()
         {
-            if (isReloading || AmmoInMagazine >= Profile.MagazineSize || ReserveAmmo <= 0)
+            if (isReloading || IsDeploying || AmmoInMagazine >= Profile.MagazineSize || ReserveAmmo <= 0)
                 return;
 
             StartCoroutine(Reload(activeProfileIndex));
@@ -284,7 +307,9 @@ namespace PolyStrike.Gameplay
         {
             isReloading = true;
             var profile = profiles[profileIndex];
-            yield return new WaitForSeconds(profile.ReloadTime);
+            viewmodel?.PlayReloadKick();
+
+            yield return new WaitForSeconds(profile.ReloadClipReadyTime);
 
             if (profileIndex != activeProfileIndex)
             {
@@ -296,7 +321,13 @@ namespace PolyStrike.Gameplay
             var loaded = Mathf.Min(needed, reserveAmmo[profileIndex]);
             magazineAmmo[profileIndex] += loaded;
             reserveAmmo[profileIndex] -= loaded;
-            isReloading = false;
+
+            var tail = Mathf.Max(0f, profile.ReloadFireReadyTime - profile.ReloadClipReadyTime);
+            if (tail > 0f)
+                yield return new WaitForSeconds(tail);
+
+            if (profileIndex == activeProfileIndex)
+                isReloading = false;
         }
     }
 }
