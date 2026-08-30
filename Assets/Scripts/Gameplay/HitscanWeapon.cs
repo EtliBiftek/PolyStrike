@@ -88,6 +88,25 @@ namespace PolyStrike.Gameplay
             SwitchProfile(PrimaryIndex);
         }
 
+        public bool CanRefundPrimary()
+        {
+            if (!primaryOwned || profiles == null)
+                return false;
+
+            var profile = profiles[PrimaryIndex];
+            return magazineAmmo[PrimaryIndex] == profile.MagazineSize && reserveAmmo[PrimaryIndex] == profile.ReserveAmmo;
+        }
+
+        public bool RefundPrimary()
+        {
+            if (!CanRefundPrimary())
+                return false;
+
+            primaryOwned = false;
+            SwitchProfile(SecondaryIndex);
+            return true;
+        }
+
         public void ResetForHalf(MatchTeam team)
         {
             matchTeam = team;
