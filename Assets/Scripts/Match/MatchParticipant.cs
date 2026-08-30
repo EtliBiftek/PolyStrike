@@ -26,6 +26,7 @@ namespace PolyStrike.Match
         public bool CarriesBomb { get; private set; }
         public Health Health => health;
         public bool IsAlive => health != null && !health.IsDead;
+        public Vector3 SpawnPosition => spawnPosition;
 
         public event Action<MatchParticipant> Died;
         public event Action<int> MoneyChanged;
@@ -54,6 +55,8 @@ namespace PolyStrike.Match
         {
             if (health != null)
                 health.Died -= OnDeath;
+            if (weapon != null)
+                weapon.EnemyKilled -= OnEnemyKilled;
         }
 
         public void Configure(MatchTeam team, bool localPlayer)
@@ -64,6 +67,9 @@ namespace PolyStrike.Match
 
         public void SetLoadoutReferences(HitscanWeapon hitscanWeapon, UtilityController utilityController)
         {
+            if (weapon != null)
+                weapon.EnemyKilled -= OnEnemyKilled;
+
             weapon = hitscanWeapon;
             utility = utilityController;
 
@@ -105,6 +111,13 @@ namespace PolyStrike.Match
             utility?.ResetForRound(diedLastRound);
             RestoreSpawn();
             EquipmentChanged?.Invoke();
+        }
+
+        public bool IsInBuyZone(float radius = 4.5f)
+        {
+            var delta = transform.position - spawnPosition;
+            delta.y = 0f;
+            return delta.sqrMagnitude <= radius * radius;
         }
 
         public void AddMoney(int amount)
