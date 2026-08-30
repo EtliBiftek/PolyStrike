@@ -211,7 +211,7 @@ namespace PolyStrike.Match
             if (!utility.CanBuy(type) || !SpendMoney(price))
                 return false;
 
-            if (utility.AddGrenade(type))
+            if (utility.AddGrenade(type, true))
             {
                 EquipmentChanged?.Invoke();
                 return true;
