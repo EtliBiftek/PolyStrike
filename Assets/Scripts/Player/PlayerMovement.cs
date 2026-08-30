@@ -32,6 +32,7 @@ namespace PolyStrike.Player
         private Vector3 planarVelocity;
         private float verticalVelocity;
         private float duckAmount;
+        private float externalMaxSpeedSourceUnits = -1f;
 
         private float velocityModifier = 1f;
         private float pendingTagFactor = 1f;
@@ -45,12 +46,25 @@ namespace PolyStrike.Player
         public Vector3 PlanarVelocity => planarVelocity;
         public float VerticalVelocity => verticalVelocity;
         public float SpeedSourceUnits => SourceUnit.ToSourceUnits(planarVelocity.magnitude);
-        public float MaxSpeedSourceUnits => heldWeapon != null ? heldWeapon.MaxMoveSpeedSourceUnits : 250f;
+        public float MaxSpeedSourceUnits => externalMaxSpeedSourceUnits > 0f
+            ? externalMaxSpeedSourceUnits
+            : heldWeapon != null ? heldWeapon.MaxMoveSpeedSourceUnits : 250f;
         public float VelocityModifier => velocityModifier;
+        public Vector3 WorldVelocity => planarVelocity + Vector3.up * verticalVelocity;
 
         public void SetHeldWeapon(HitscanWeapon weapon)
         {
             heldWeapon = weapon;
+        }
+
+        public void SetExternalMaxSpeed(float sourceUnits)
+        {
+            externalMaxSpeedSourceUnits = Mathf.Max(sourceUnits, 1f);
+        }
+
+        public void ClearExternalMaxSpeed()
+        {
+            externalMaxSpeedSourceUnits = -1f;
         }
 
         public void ApplyTag(float newSpeedVsM4)
