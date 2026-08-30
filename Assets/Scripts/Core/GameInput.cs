@@ -150,6 +150,30 @@ namespace PolyStrike.Core
             }
         }
 
+        public static bool UseHeld
+        {
+            get
+            {
+#if ENABLE_INPUT_SYSTEM
+                return Keyboard.current?.eKey.isPressed == true;
+#else
+                return Input.GetKey(KeyCode.E);
+#endif
+            }
+        }
+
+        public static bool BuyPressed
+        {
+            get
+            {
+#if ENABLE_INPUT_SYSTEM
+                return Keyboard.current?.bKey.wasPressedThisFrame == true;
+#else
+                return Input.GetKeyDown(KeyCode.B);
+#endif
+            }
+        }
+
         public static bool ReloadPressed
         {
             get
