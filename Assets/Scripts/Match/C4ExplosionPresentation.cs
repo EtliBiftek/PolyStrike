@@ -40,6 +40,8 @@ namespace PolyStrike.Match
 
         private IEnumerator AnimateExplosion()
         {
+            var damageField = C4ShockwaveDamageField.Build(transform.position);
+
             var light = gameObject.AddComponent<Light>();
             light.type = LightType.Point;
             light.shadows = LightShadows.None;
@@ -73,12 +75,14 @@ namespace PolyStrike.Match
                 shockwave.transform.localScale = Vector3.one * radius;
                 light.intensity = Mathf.Lerp(16f, 0f, t);
 
+                damageField.ApplyReachedRadius(radius);
                 SmokeCloud.ShockwaveClear(transform.position, radius);
                 InfernoArea.ShockwaveExtinguish(transform.position, radius);
                 PushDroppedItems(radius);
                 yield return null;
             }
 
+            damageField.ApplyReachedRadius(maxRadius);
             Destroy(shockwave);
             light.intensity = 0f;
             Destroy(gameObject, Mathf.Max(0.05f, GetExplosionClip().length - expansionTime));
