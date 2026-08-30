@@ -1,5 +1,6 @@
 using System.Collections;
 using System.Collections.Generic;
+using PolyStrike.Match;
 using PolyStrike.Player;
 using UnityEngine;
 
@@ -11,6 +12,7 @@ namespace PolyStrike.Gameplay
         private const float HeBaseDamage = 99f;
         private const float FlashRadiusUnits = 1500f;
         private const float FlashMaxDuration = 5.07f;
+        private const float TeammateGrenadeDamageScale = 0.85f;
 
         private static GrenadeEffects instance;
         private static readonly Dictionary<SurfaceMaterial, AudioClip> BounceClips = new Dictionary<SurfaceMaterial, AudioClip>();
@@ -49,14 +51,18 @@ namespace PolyStrike.Gameplay
             PlayWorldClip(GetBounceClip(surface), position, volume, 18f);
         }
 
-        public static void Detonate(GrenadeType type, Vector3 position)
+        public static void Detonate(
+            GrenadeType type,
+            Vector3 position,
+            MatchParticipant owner = null,
+            bool incendiary = false)
         {
             EnsureExists();
 
             switch (type)
             {
                 case GrenadeType.HighExplosive:
-                    instance.DetonateHe(position);
+                    instance.DetonateHe(position, owner);
                     break;
                 case GrenadeType.Flashbang:
                     instance.DetonateFlash(position);
@@ -65,12 +71,12 @@ namespace PolyStrike.Gameplay
                     instance.DetonateSmoke(position);
                     break;
                 case GrenadeType.Molotov:
-                    instance.DetonateMolotov(position);
+                    instance.DetonateMolotov(position, owner, incendiary);
                     break;
             }
         }
 
-        private void DetonateHe(Vector3 position)
+        private void DetonateHe(Vector3 position, MatchParticipant owner)
         {
             PlayWorldClip(GetExplosionClip(), position, 1f, 48f);
             StartCoroutine(ExplosionFlash(position, new Color(1f, 0.53f, 0.18f), 5.6f, 0.085f));
@@ -89,6 +95,8 @@ namespace PolyStrike.Gameplay
                     continue;
 
                 var rawDamage = HeBaseDamage * (1f - distanceUnits / HeRadiusUnits);
+                rawDamage *= GetGrenadeDamageScale(owner, health.GetComponent<MatchParticipant>());
+
                 var direction = (damagePoint - position).normalized;
                 health.TakeGrenadeDamage(rawDamage, direction);
             }
@@ -130,7 +138,7 @@ namespace PolyStrike.Gameplay
             SmokeCloud.Spawn(position);
         }
 
-        private void DetonateMolotov(Vector3 position)
+        private void DetonateMolotov(Vector3 position, MatchParticipant owner, bool incendiary)
         {
             if (SmokeCloud.IsPointInsideAny(position))
             {
@@ -140,7 +148,18 @@ namespace PolyStrike.Gameplay
 
             PlayWorldClip(GetIgniteClip(), position, 0.84f, 32f);
             StartCoroutine(ExplosionFlash(position, new Color(1f, 0.20f, 0.03f), 3.2f, 0.07f));
-            InfernoArea.Spawn(position);
+            InfernoArea.Spawn(position, owner, incendiary);
+        }
+
+        private static float GetGrenadeDamageScale(MatchParticipant owner, MatchParticipant victim)
+        {
+            if (owner == null || victim == null || owner.Team != victim.Team)
+                return 1f;
+
+            if (owner == victim)
+                return 1f;
+
+            return TeammateGrenadeDamageScale;
         }
 
         private static Vector3 GetClosestDamagePoint(Health health, Vector3 explosion)
@@ -262,7 +281,7 @@ namespace PolyStrike.Gameplay
 
         private static AudioClip GetIgniteClip()
         {
-            return igniteClip ??= MakeBurst("Molotov Ignite", 510f, 0.26f, 0.62f, 8.5f);
+            return igniteClip ??= MakeBurst("Fire Grenade Ignite", 510f, 0.26f, 0.62f, 8.5f);
         }
 
         private static AudioClip MakeBurst(string name, float frequency, float duration, float amplitude, float decay)
