@@ -1,5 +1,5 @@
+using PolyStrike.Core;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 namespace PolyStrike.Player
 {
@@ -31,7 +31,7 @@ namespace PolyStrike.Player
 
         private void Update()
         {
-            if (Keyboard.current?.escapeKey.wasPressedThisFrame == true)
+            if (GameInput.EscapePressed)
             {
                 Cursor.lockState = CursorLockMode.None;
                 Cursor.visible = true;
@@ -40,17 +40,16 @@ namespace PolyStrike.Player
 
             if (Cursor.lockState != CursorLockMode.Locked)
             {
-                if (Mouse.current?.leftButton.wasPressedThisFrame == true)
+                if (GameInput.FirePressed)
                     LockCursor();
 
                 return;
             }
 
-            var mouse = Mouse.current;
-            if (mouse == null || cameraTransform == null)
+            if (cameraTransform == null)
                 return;
 
-            var delta = mouse.delta.ReadValue() * sensitivity;
+            var delta = GameInput.MouseDelta * sensitivity;
             pitch = Mathf.Clamp(pitch - delta.y, -89f, 89f);
 
             transform.Rotate(0f, delta.x, 0f, Space.Self);

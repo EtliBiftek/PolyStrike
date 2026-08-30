@@ -1,6 +1,6 @@
 using System.Collections;
+using PolyStrike.Core;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 namespace PolyStrike.Gameplay
 {
@@ -35,13 +35,10 @@ namespace PolyStrike.Gameplay
 
         private void Update()
         {
-            var mouse = Mouse.current;
-            var keyboard = Keyboard.current;
-
-            if (keyboard?.rKey.wasPressedThisFrame == true)
+            if (GameInput.ReloadPressed)
                 TryStartReload();
 
-            if (mouse == null || !mouse.leftButton.isPressed || Cursor.lockState != CursorLockMode.Locked)
+            if (!GameInput.FireHeld || Cursor.lockState != CursorLockMode.Locked)
                 return;
 
             TryFire();

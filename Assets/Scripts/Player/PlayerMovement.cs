@@ -1,5 +1,5 @@
+using PolyStrike.Core;
 using UnityEngine;
-using UnityEngine.InputSystem;
 
 namespace PolyStrike.Player
 {
@@ -37,14 +37,10 @@ namespace PolyStrike.Player
 
         private void Update()
         {
-            var keyboard = Keyboard.current;
-            if (keyboard == null)
-                return;
-
-            IsCrouching = keyboard.leftCtrlKey.isPressed || keyboard.cKey.isPressed;
+            IsCrouching = GameInput.CrouchHeld;
             UpdateControllerHeight();
 
-            var input = ReadMovementInput(keyboard);
+            var input = GameInput.Movement;
             var wishDirection = transform.forward * input.y + transform.right * input.x;
             if (wishDirection.sqrMagnitude > 1f)
                 wishDirection.Normalize();
@@ -60,7 +56,7 @@ namespace PolyStrike.Player
                 var targetSpeed = IsCrouching ? crouchSpeed : maxGroundSpeed;
                 Accelerate(wishDirection, targetSpeed, groundAcceleration);
 
-                if (keyboard.spaceKey.wasPressedThisFrame && !IsCrouching)
+                if (GameInput.JumpPressed && !IsCrouching)
                     verticalVelocity = Mathf.Sqrt(jumpHeight * -2f * gravity);
             }
             else
@@ -75,19 +71,6 @@ namespace PolyStrike.Player
 
             if ((collision & CollisionFlags.Above) != 0 && verticalVelocity > 0f)
                 verticalVelocity = 0f;
-        }
-
-        private static Vector2 ReadMovementInput(Keyboard keyboard)
-        {
-            var x = 0f;
-            var y = 0f;
-
-            if (keyboard.aKey.isPressed) x -= 1f;
-            if (keyboard.dKey.isPressed) x += 1f;
-            if (keyboard.sKey.isPressed) y -= 1f;
-            if (keyboard.wKey.isPressed) y += 1f;
-
-            return new Vector2(x, y);
         }
 
         private void ApplyGroundFriction()
