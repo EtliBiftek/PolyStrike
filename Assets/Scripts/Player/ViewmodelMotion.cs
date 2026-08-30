@@ -21,18 +21,21 @@ namespace PolyStrike.Player
         private Renderer[] weaponRenderers;
         private GameObject utilityModel;
         private Renderer utilityRenderer;
+        private GameObject bombModel;
         private Vector3 recoilPosition;
         private Vector3 recoilRotation;
         private float deployUntil;
         private float deployDuration = 1f;
         private float bobTime;
         private bool utilityMode;
+        private bool bombMode;
 
         private void Awake()
         {
             movement = GetComponentInParent<PlayerMovement>();
             weaponRenderers = GetComponentsInChildren<Renderer>(true);
             CreateUtilityModel();
+            CreateBombModel();
         }
 
         public void PlayShot(Vector2 recoilStep)
@@ -56,18 +59,37 @@ namespace PolyStrike.Player
         public void SetUtilityMode(bool enabled, GrenadeType type = GrenadeType.HighExplosive)
         {
             utilityMode = enabled;
+            if (enabled)
+                bombMode = false;
 
-            for (var i = 0; i < weaponRenderers.Length; i++)
-            {
-                if (weaponRenderers[i] != null)
-                    weaponRenderers[i].enabled = !enabled;
-            }
-
-            if (utilityModel != null)
-                utilityModel.SetActive(enabled);
+            UpdateEquipmentVisibility();
 
             if (enabled)
                 ApplyUtilityAppearance(type);
+        }
+
+        public void SetBombMode(bool enabled)
+        {
+            bombMode = enabled;
+            if (enabled)
+                utilityMode = false;
+
+            UpdateEquipmentVisibility();
+        }
+
+        private void UpdateEquipmentVisibility()
+        {
+            var equipmentMode = utilityMode || bombMode;
+            for (var i = 0; i < weaponRenderers.Length; i++)
+            {
+                if (weaponRenderers[i] != null)
+                    weaponRenderers[i].enabled = !equipmentMode;
+            }
+
+            if (utilityModel != null)
+                utilityModel.SetActive(utilityMode);
+            if (bombModel != null)
+                bombModel.SetActive(bombMode);
         }
 
         private void LateUpdate()
@@ -102,9 +124,15 @@ namespace PolyStrike.Player
             recoilPosition = Vector3.Lerp(recoilPosition, Vector3.zero, 1f - Mathf.Exp(-returnSpeed * Time.deltaTime));
             recoilRotation = Vector3.Lerp(recoilRotation, Vector3.zero, 1f - Mathf.Exp(-returnSpeed * 0.8f * Time.deltaTime));
 
-            var modePosition = utilityMode ? new Vector3(-0.02f, -0.10f, 0.30f) : basePosition;
-            var modeRotation = utilityMode ? new Vector3(10f, 2f, -4f) : baseRotation;
-            transform.localPosition = modePosition + bob * (utilityMode ? 0.72f : 1f) + sway + recoilPosition + deployOffset;
+            var equipmentMode = utilityMode || bombMode;
+            var modePosition = bombMode
+                ? new Vector3(-0.015f, -0.115f, 0.28f)
+                : utilityMode ? new Vector3(-0.02f, -0.10f, 0.30f) : basePosition;
+            var modeRotation = bombMode
+                ? new Vector3(15f, 2f, -2f)
+                : utilityMode ? new Vector3(10f, 2f, -4f) : baseRotation;
+
+            transform.localPosition = modePosition + bob * (equipmentMode ? 0.72f : 1f) + sway + recoilPosition + deployOffset;
             transform.localRotation = Quaternion.Euler(modeRotation + swayAngles + recoilRotation + deployAngles);
         }
 
@@ -122,8 +150,35 @@ namespace PolyStrike.Player
                 Destroy(collider);
 
             utilityRenderer = utilityModel.GetComponent<Renderer>();
-            utilityRenderer.material = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"));
+            var shader = Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard");
+            if (shader != null)
+                utilityRenderer.material = new Material(shader);
             utilityModel.SetActive(false);
+        }
+
+        private void CreateBombModel()
+        {
+            bombModel = new GameObject("C4 Viewmodel");
+            bombModel.layer = gameObject.layer;
+            bombModel.transform.SetParent(transform, false);
+
+            var body = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            body.name = "C4 Gövde";
+            body.layer = gameObject.layer;
+            body.transform.SetParent(bombModel.transform, false);
+            body.transform.localPosition = new Vector3(0.055f, -0.015f, 0.06f);
+            body.transform.localScale = new Vector3(0.16f, 0.08f, 0.12f);
+            Destroy(body.GetComponent<Collider>());
+
+            var keypad = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            keypad.name = "C4 Tuş Takımı";
+            keypad.layer = gameObject.layer;
+            keypad.transform.SetParent(bombModel.transform, false);
+            keypad.transform.localPosition = new Vector3(0.055f, 0.035f, 0.055f);
+            keypad.transform.localScale = new Vector3(0.105f, 0.015f, 0.075f);
+            Destroy(keypad.GetComponent<Collider>());
+
+            bombModel.SetActive(false);
         }
 
         private void ApplyUtilityAppearance(GrenadeType type)
