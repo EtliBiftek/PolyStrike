@@ -1,4 +1,6 @@
 using System.Collections;
+using System.Collections.Generic;
+using PolyStrike.Gameplay;
 using UnityEngine;
 
 namespace PolyStrike.Match
@@ -7,6 +9,8 @@ namespace PolyStrike.Match
     {
         private static Material shockwaveMaterial;
         private static AudioClip explosionClip;
+
+        private readonly HashSet<Rigidbody> pushedBodies = new HashSet<Rigidbody>();
 
         public static void Play(Vector3 position)
         {
@@ -57,19 +61,47 @@ namespace PolyStrike.Match
 
             var elapsed = 0f;
             const float expansionTime = 0.34f;
+            const float maxRadius = 18f;
+
             while (elapsed < expansionTime)
             {
                 elapsed += Time.deltaTime;
                 var t = Mathf.Clamp01(elapsed / expansionTime);
                 var eased = 1f - Mathf.Pow(1f - t, 3f);
-                shockwave.transform.localScale = Vector3.one * Mathf.Lerp(0.15f, 18f, eased);
+                var radius = Mathf.Lerp(0.15f, maxRadius, eased);
+
+                shockwave.transform.localScale = Vector3.one * radius;
                 light.intensity = Mathf.Lerp(16f, 0f, t);
+
+                SmokeCloud.ShockwaveClear(transform.position, radius);
+                InfernoArea.ShockwaveExtinguish(transform.position, radius);
+                PushDroppedItems(radius);
                 yield return null;
             }
 
             Destroy(shockwave);
             light.intensity = 0f;
             Destroy(gameObject, Mathf.Max(0.05f, GetExplosionClip().length - expansionTime));
+        }
+
+        private void PushDroppedItems(float radius)
+        {
+            var colliders = Physics.OverlapSphere(transform.position, radius, ~0, QueryTriggerInteraction.Collide);
+            for (var i = 0; i < colliders.Length; i++)
+            {
+                var item = colliders[i].GetComponentInParent<DroppedMatchItem>();
+                if (item == null)
+                    continue;
+
+                var body = item.GetComponent<Rigidbody>();
+                if (body == null || !pushedBodies.Add(body))
+                    continue;
+
+                var delta = body.worldCenterOfMass - transform.position;
+                var direction = delta.sqrMagnitude > 0.001f ? delta.normalized : Vector3.up;
+                direction = (direction + Vector3.up * 0.28f).normalized;
+                body.AddForce(direction * 8.5f, ForceMode.Impulse);
+            }
         }
 
         private void SpawnDebris()
