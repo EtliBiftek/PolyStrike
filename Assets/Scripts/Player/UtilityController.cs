@@ -86,11 +86,50 @@ namespace PolyStrike.Player
                 return false;
 
             inventory[index]--;
-
             if (utilityEquipped && selectedType == type && inventory[index] <= 0)
                 ForceHolster();
-
             return true;
+        }
+
+        public bool TryDropSelected(out GrenadeType type)
+        {
+            type = selectedType;
+            if (!utilityEquipped || primed || throwPending || inventory[(int)selectedType] <= 0)
+                return false;
+
+            inventory[(int)selectedType]--;
+            ForceHolster();
+            return true;
+        }
+
+        public bool TryTakeDeathDrop(MatchTeam team, out GrenadeType type)
+        {
+            if (utilityEquipped && inventory[(int)selectedType] > 0)
+            {
+                type = selectedType;
+                inventory[(int)type]--;
+                ForceHolster();
+                return true;
+            }
+
+            var order = team == MatchTeam.CounterTerrorists
+                ? new[] { GrenadeType.Molotov, GrenadeType.Smoke, GrenadeType.HighExplosive, GrenadeType.Flashbang }
+                : new[] { GrenadeType.Molotov, GrenadeType.Smoke, GrenadeType.HighExplosive, GrenadeType.Flashbang };
+
+            for (var i = 0; i < order.Length; i++)
+            {
+                var candidate = order[i];
+                if (inventory[(int)candidate] <= 0)
+                    continue;
+
+                inventory[(int)candidate]--;
+                type = candidate;
+                ForceHolster();
+                return true;
+            }
+
+            type = GrenadeType.HighExplosive;
+            return false;
         }
 
         public int GetCount(GrenadeType type)
@@ -128,7 +167,6 @@ namespace PolyStrike.Player
             if (externalInputBlocked)
                 return;
 
-            // Release sonrası CS2 atışı tamamlar; bu kısa pencerede weapon switch throw'u iptal etmez.
             if (throwPending)
                 return;
 
@@ -142,7 +180,7 @@ namespace PolyStrike.Player
 
         private void HandleSelection()
         {
-            if (GameInput.Weapon1Pressed || GameInput.Weapon2Pressed)
+            if (GameInput.Weapon1Pressed || GameInput.Weapon2Pressed || GameInput.BombPressed)
             {
                 UnequipUtility();
                 return;
