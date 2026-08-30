@@ -64,6 +64,7 @@ namespace PolyStrike.Match
         public const int FlashPrice = 200;
         public const int SmokePrice = 300;
         public const int MolotovPrice = 400;
+        public const int IncendiaryPrice = 500;
 
         public static int LossReward(int lossLevel)
         {
