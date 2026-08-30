@@ -24,18 +24,24 @@ namespace PolyStrike.Core
             EnsureStyles();
 
             GUI.Label(new Rect(20f, 20f, 600f, 30f), Localization.Get("prototype.title"), textStyle);
-            GUI.Label(new Rect(20f, 48f, 1000f, 30f), Localization.Get("prototype.controls"), textStyle);
+            GUI.Label(new Rect(20f, 48f, 1100f, 30f), Localization.Get("prototype.controls"), textStyle);
 
             if (movement != null)
             {
                 var speedText = string.Format(Localization.Get("hud.speed"), Mathf.RoundToInt(movement.SpeedSourceUnits));
                 GUI.Label(new Rect(20f, 78f, 300f, 30f), speedText, textStyle);
+
+                var tagText = string.Format(Localization.Get("hud.velocity_modifier"), movement.VelocityModifier);
+                GUI.Label(new Rect(20f, 106f, 300f, 30f), tagText, textStyle);
             }
 
             if (health != null)
             {
                 var healthText = string.Format(Localization.Get("hud.health"), Mathf.CeilToInt(health.Current));
-                GUI.Label(new Rect(20f, Screen.height - 55f, 250f, 30f), healthText, textStyle);
+                GUI.Label(new Rect(20f, Screen.height - 55f, 220f, 30f), healthText, textStyle);
+
+                var armorText = string.Format(Localization.Get("hud.armor"), Mathf.CeilToInt(health.Armor));
+                GUI.Label(new Rect(180f, Screen.height - 55f, 220f, 30f), armorText, textStyle);
             }
 
             if (weapon != null)

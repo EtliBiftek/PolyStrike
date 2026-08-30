@@ -1,12 +1,14 @@
 # PolyStrike - Türkçe
 # Yeni bir dil eklemek için bu dosyayı kopyalayıp örneğin en.txt olarak çevirmen yeterli.
 
-prototype.title=PolyStrike - Hareket ve Silah Prototipi
+prototype.title=PolyStrike - CS2 Hissi Prototipi
 prototype.controls=WASD: Hareket | Shift: Yürü | Space: Zıpla | Ctrl/C: Çömel | 1/2: Tüfek Değiştir | Sol Tık: Ateş | R: Şarjör Değiştir | Esc: İmleci Bırak
 hud.health=Can: {0}
+hud.armor=Zırh: {0}
 hud.ammo=Mermi: {0} / {1}
 hud.reloading=Şarjör değiştiriliyor...
 hud.speed=Hız: {0} u/s
+hud.velocity_modifier=Tag hızı: x{0:0.00}
 hud.inaccuracy=Sapma: {0:0.0000}
 weapon.t_rifle=T Tüfeği
 weapon.ct_rifle=CT Tüfeği

@@ -8,6 +8,9 @@ namespace PolyStrike.Gameplay
         public float Damage { get; private set; }
         public float RangeMeters { get; private set; }
         public float RangeModifier { get; private set; }
+        public float ArmorPenetration { get; private set; }
+        public float PenetrationPower { get; private set; }
+        public float TaggingBaseVsM4 { get; private set; }
         public float RoundsPerMinute { get; private set; }
         public int MagazineSize { get; private set; }
         public int ReserveAmmo { get; private set; }
@@ -34,6 +37,9 @@ namespace PolyStrike.Gameplay
                 Damage = 36f,
                 RangeMeters = 120f,
                 RangeModifier = 0.98f,
+                ArmorPenetration = 0.775f,
+                PenetrationPower = 2f,
+                TaggingBaseVsM4 = 0.319f,
                 RoundsPerMinute = 600f,
                 MagazineSize = 30,
                 ReserveAmmo = 90,
@@ -70,6 +76,9 @@ namespace PolyStrike.Gameplay
                 Damage = 33f,
                 RangeMeters = 120f,
                 RangeModifier = 0.97f,
+                ArmorPenetration = 0.70f,
+                PenetrationPower = 2f,
+                TaggingBaseVsM4 = 0.319f,
                 RoundsPerMinute = 667f,
                 MagazineSize = 30,
                 ReserveAmmo = 90,

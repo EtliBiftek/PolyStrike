@@ -7,6 +7,9 @@ namespace PolyStrike.Gameplay
 {
     public sealed class HitscanWeapon : MonoBehaviour
     {
+        private const int MaxPenetrations = 4;
+        private const float ExitPadding = 0.01f;
+
         [SerializeField] private LayerMask hitMask = ~0;
 
         private Camera shotCamera;
@@ -106,15 +109,100 @@ namespace PolyStrike.Gameplay
             var direction = BuildShotDirection(recoilPoint, CurrentInaccuracy);
             var origin = playerLook != null ? playerLook.AimOrigin : shotCamera.transform.position;
 
-            if (Physics.Raycast(origin, direction, out var hit, Profile.RangeMeters, hitMask, QueryTriggerInteraction.Ignore))
-            {
-                var health = hit.collider.GetComponentInParent<Health>();
-                if (health != null)
-                    health.TakeDamage(CalculateDamage(hit.distance));
-            }
+            FireBullet(origin, direction);
 
             accuracyPenalty += Profile.FireInaccuracy;
             sprayIndex++;
+        }
+
+        private void FireBullet(Vector3 origin, Vector3 direction)
+        {
+            var currentDamage = Profile.Damage;
+            var remainingRange = Profile.RangeMeters;
+            var traceOrigin = origin;
+            var penetrationsLeft = MaxPenetrations;
+
+            while (currentDamage >= 1f && remainingRange > 0f)
+            {
+                if (!Physics.Raycast(traceOrigin, direction, out var hit, remainingRange, hitMask, QueryTriggerInteraction.Ignore))
+                    return;
+
+                var airDistanceUnits = SourceUnit.ToSourceUnits(hit.distance);
+                currentDamage *= Mathf.Pow(Profile.RangeModifier, airDistanceUnits / 500f);
+                remainingRange -= hit.distance;
+
+                var hitbox = hit.collider.GetComponent<PlayerHitbox>();
+                if (hitbox != null && hitbox.Health != null)
+                {
+                    hitbox.Health.TakeBulletDamage(new BulletDamage(
+                        currentDamage,
+                        Profile.ArmorPenetration,
+                        Profile.TaggingBaseVsM4,
+                        hitbox.HitGroup));
+                    return;
+                }
+
+                var health = hit.collider.GetComponentInParent<Health>();
+                if (health != null)
+                {
+                    health.TakeBulletDamage(new BulletDamage(
+                        currentDamage,
+                        Profile.ArmorPenetration,
+                        Profile.TaggingBaseVsM4,
+                        HitGroup.Chest));
+                    return;
+                }
+
+                if (penetrationsLeft <= 0)
+                    return;
+
+                var surface = hit.collider.GetComponent<PenetrableSurface>();
+                if (surface == null)
+                    surface = hit.collider.GetComponentInParent<PenetrableSurface>();
+
+                if (surface == null || !TryPenetrate(hit, surface, direction, ref traceOrigin, ref remainingRange, ref currentDamage))
+                    return;
+
+                penetrationsLeft--;
+            }
+        }
+
+        private bool TryPenetrate(
+            RaycastHit entryHit,
+            PenetrableSurface surface,
+            Vector3 direction,
+            ref Vector3 traceOrigin,
+            ref float remainingRange,
+            ref float currentDamage)
+        {
+            var hitCollider = entryHit.collider;
+            var probeDistance = hitCollider.bounds.size.magnitude + 0.2f;
+            var probeOrigin = entryHit.point + direction * probeDistance;
+            var backRay = new Ray(probeOrigin, -direction);
+
+            if (!hitCollider.Raycast(backRay, out var exitHit, probeDistance + 0.25f))
+                return false;
+
+            var thicknessMeters = Vector3.Distance(entryHit.point, exitHit.point);
+            if (thicknessMeters <= 0.0001f || thicknessMeters >= remainingRange)
+                return false;
+
+            var thicknessUnits = SourceUnit.ToSourceUnits(thicknessMeters);
+            var penetrationModifier = Mathf.Max(surface.SameMaterialModifier, 0.01f);
+            var inverseModifier = 1f / penetrationModifier;
+
+            var lostDamage = currentDamage * surface.DamageLossModifier;
+            lostDamage += (3.75f / Mathf.Max(Profile.PenetrationPower, 0.01f)) * (inverseModifier * 3f);
+            lostDamage += inverseModifier * thicknessUnits * thicknessUnits / 24f;
+
+            currentDamage -= Mathf.Max(lostDamage, 0f);
+            if (currentDamage < 1f)
+                return false;
+
+            currentDamage *= Mathf.Pow(Profile.RangeModifier, thicknessUnits / 500f);
+            remainingRange -= thicknessMeters;
+            traceOrigin = exitHit.point + direction * ExitPadding;
+            return true;
         }
 
         private Vector3 BuildShotDirection(Vector2 recoilPoint, float inaccuracy)
@@ -149,7 +237,6 @@ namespace PolyStrike.Gameplay
 
             var movementFactor = Mathf.Clamp01((speedFraction - 0.34f) / (0.95f - 0.34f));
 
-            // Yürüyüşteki ceza daha yumuşak; koşuda CS'nin keskin eğrisine yakın davranıyor.
             if (!GameInput.WalkHeld)
                 movementFactor = Mathf.Pow(movementFactor, 0.25f);
 
@@ -166,13 +253,6 @@ namespace PolyStrike.Gameplay
             var recoveryTime = crouched ? Profile.CrouchingRecoveryTime : Profile.StandingRecoveryTime;
             var recoveryPerSecond = Profile.FireInaccuracy / Mathf.Max(recoveryTime, 0.01f);
             accuracyPenalty = Mathf.MoveTowards(accuracyPenalty, 0f, recoveryPerSecond * Time.deltaTime);
-        }
-
-        private float CalculateDamage(float distanceMeters)
-        {
-            var distanceSourceUnits = SourceUnit.ToSourceUnits(distanceMeters);
-            var damage = Profile.Damage * Mathf.Pow(Profile.RangeModifier, distanceSourceUnits / 500f);
-            return Mathf.Floor(damage);
         }
 
         private void SwitchProfile(int index)

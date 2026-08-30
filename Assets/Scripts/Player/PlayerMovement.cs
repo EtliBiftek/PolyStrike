@@ -18,6 +18,11 @@ namespace PolyStrike.Player
         private const float DuckMultiplier = 0.34f;
         private const float DuckRate = 6.4f;
 
+        private const float TagDelaySeconds = 2f / 64f;
+        private const float TagRecoveryPerSecond = 0.4f;
+        private const float RapidTagWindow = 0.5f;
+        private const float TargetMobilitySlope = 0.002725f;
+
         [Header("Boyut")]
         [SerializeField] private float standingHeight = 1.829f;
         [SerializeField] private float crouchingHeight = 1.372f;
@@ -28,6 +33,12 @@ namespace PolyStrike.Player
         private float verticalVelocity;
         private float duckAmount;
 
+        private float velocityModifier = 1f;
+        private float pendingTagFactor = 1f;
+        private float pendingTagApplyTime = -1f;
+        private float lastTagTime = -10f;
+        private int rapidTagHits;
+
         public bool IsGrounded => controller != null && controller.isGrounded;
         public bool IsCrouching => duckAmount > 0.5f;
         public float DuckAmount => duckAmount;
@@ -35,10 +46,28 @@ namespace PolyStrike.Player
         public float VerticalVelocity => verticalVelocity;
         public float SpeedSourceUnits => SourceUnit.ToSourceUnits(planarVelocity.magnitude);
         public float MaxSpeedSourceUnits => heldWeapon != null ? heldWeapon.MaxMoveSpeedSourceUnits : 250f;
+        public float VelocityModifier => velocityModifier;
 
         public void SetHeldWeapon(HitscanWeapon weapon)
         {
             heldWeapon = weapon;
+        }
+
+        public void ApplyTag(float newSpeedVsM4)
+        {
+            var now = Time.time;
+            rapidTagHits = now - lastTagTime <= RapidTagWindow ? rapidTagHits + 1 : 1;
+            lastTagTime = now;
+
+            var mobilityAdjustment = (MaxSpeedSourceUnits - 225f) * TargetMobilitySlope;
+            var firstHitFactor = Mathf.Clamp(newSpeedVsM4 + mobilityAdjustment, 0.15f, 0.5f);
+
+            // Valve'ın örneklerindeki ardışık hitler hızla bir tabana yaklaşıyor.
+            var cumulativeFactor = firstHitFactor * (0.65f + 0.35f * Mathf.Pow(0.25f, rapidTagHits - 1));
+            pendingTagFactor = pendingTagApplyTime < 0f
+                ? cumulativeFactor
+                : Mathf.Min(pendingTagFactor, cumulativeFactor);
+            pendingTagApplyTime = now + TagDelaySeconds;
         }
 
         private void Awake()
@@ -50,6 +79,7 @@ namespace PolyStrike.Player
 
         private void Update()
         {
+            UpdateTagging();
             UpdateDuck();
 
             var input = GameInput.Movement;
@@ -85,9 +115,28 @@ namespace PolyStrike.Player
                 verticalVelocity = 0f;
         }
 
+        private void UpdateTagging()
+        {
+            if (pendingTagApplyTime >= 0f && Time.time >= pendingTagApplyTime)
+            {
+                velocityModifier = Mathf.Min(velocityModifier, pendingTagFactor);
+                pendingTagApplyTime = -1f;
+                pendingTagFactor = 1f;
+
+                var taggedMaxSpeed = SourceUnit.ToMeters(MaxSpeedSourceUnits) * velocityModifier;
+                if (planarVelocity.magnitude > taggedMaxSpeed)
+                    planarVelocity = planarVelocity.normalized * taggedMaxSpeed;
+            }
+
+            if (!controller.isGrounded || pendingTagApplyTime >= 0f || Time.time - lastTagTime < 0.1f)
+                return;
+
+            velocityModifier = Mathf.MoveTowards(velocityModifier, 1f, TagRecoveryPerSecond * Time.deltaTime);
+        }
+
         private float GetGroundWishSpeed(float inputLength)
         {
-            var maxSpeed = SourceUnit.ToMeters(MaxSpeedSourceUnits);
+            var maxSpeed = SourceUnit.ToMeters(MaxSpeedSourceUnits) * velocityModifier;
 
             if (GameInput.WalkHeld)
                 maxSpeed *= WalkMultiplier;
@@ -132,7 +181,7 @@ namespace PolyStrike.Player
             if (direction.sqrMagnitude < 0.001f || inputLength <= 0f)
                 return;
 
-            var uncappedWishSpeed = SourceUnit.ToMeters(MaxSpeedSourceUnits) * inputLength;
+            var uncappedWishSpeed = SourceUnit.ToMeters(MaxSpeedSourceUnits) * velocityModifier * inputLength;
             var cappedWishSpeed = Mathf.Min(uncappedWishSpeed, SourceUnit.ToMeters(AirWishSpeedCap));
             var currentSpeed = Vector3.Dot(planarVelocity, direction);
             var speedToAdd = cappedWishSpeed - currentSpeed;

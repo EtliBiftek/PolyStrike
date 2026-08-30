@@ -35,18 +35,24 @@ namespace PolyStrike.Core
             var floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
             floor.name = "Zemin";
             floor.transform.localScale = new Vector3(5f, 1f, 5f);
+            floor.AddComponent<PenetrableSurface>().Configure(SurfaceMaterial.Concrete);
 
-            CreateBlock(new Vector3(0f, 1.5f, 15f), new Vector3(30f, 3f, 1f));
-            CreateBlock(new Vector3(-15f, 1.5f, 0f), new Vector3(1f, 3f, 30f));
-            CreateBlock(new Vector3(15f, 1.5f, 0f), new Vector3(1f, 3f, 30f));
+            CreateBlock(new Vector3(0f, 1.5f, 15f), new Vector3(30f, 3f, 1f), SurfaceMaterial.Concrete);
+            CreateBlock(new Vector3(-15f, 1.5f, 0f), new Vector3(1f, 3f, 30f), SurfaceMaterial.Concrete);
+            CreateBlock(new Vector3(15f, 1.5f, 0f), new Vector3(1f, 3f, 30f), SurfaceMaterial.Concrete);
+
+            CreateBlock(new Vector3(-3f, 1.05f, 6f), new Vector3(2.4f, 2.1f, 0.14f), SurfaceMaterial.Wood, "Ahşap Test Paneli");
+            CreateBlock(new Vector3(3f, 1.05f, 7f), new Vector3(2.4f, 2.1f, 0.08f), SurfaceMaterial.Metal, "Metal Test Paneli");
+            CreateBlock(new Vector3(0f, 1.05f, 5f), new Vector3(2.4f, 2.1f, 0.05f), SurfaceMaterial.Glass, "Cam Test Paneli");
         }
 
-        private static void CreateBlock(Vector3 position, Vector3 scale)
+        private static void CreateBlock(Vector3 position, Vector3 scale, SurfaceMaterial material, string objectName = "Duvar")
         {
             var block = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            block.name = "Duvar";
+            block.name = objectName;
             block.transform.position = position;
             block.transform.localScale = scale;
+            block.AddComponent<PenetrableSurface>().Configure(material);
         }
 
         private static void CreatePlayer()
@@ -88,21 +94,48 @@ namespace PolyStrike.Core
         {
             var positions = new[]
             {
-                new Vector3(-6f, 0.9f, 7f),
-                new Vector3(-3f, 0.9f, 10f),
-                new Vector3(0f, 0.9f, 8f),
-                new Vector3(3f, 0.9f, 11f),
-                new Vector3(6f, 0.9f, 7f)
+                new Vector3(-6f, 0f, 7f),
+                new Vector3(-3f, 0f, 10f),
+                new Vector3(0f, 0f, 8f),
+                new Vector3(3f, 0f, 11f),
+                new Vector3(6f, 0f, 7f)
             };
 
             for (var i = 0; i < positions.Length; i++)
-            {
-                var target = GameObject.CreatePrimitive(PrimitiveType.Cube);
-                target.name = $"Hedef {i + 1}";
-                target.transform.position = positions[i];
-                target.transform.localScale = new Vector3(0.75f, 1.8f, 0.5f);
-                target.AddComponent<Health>();
-            }
+                CreateTarget($"Hedef {i + 1}", positions[i]);
+        }
+
+        private static void CreateTarget(string targetName, Vector3 position)
+        {
+            var root = new GameObject(targetName);
+            root.transform.position = position;
+
+            var health = root.AddComponent<Health>();
+            health.SetEquipment(100f, true);
+
+            CreateHitboxPart(root.transform, health, HitGroup.Head, "Kafa", new Vector3(0f, 1.66f, 0f), new Vector3(0.30f, 0.30f, 0.30f));
+            CreateHitboxPart(root.transform, health, HitGroup.Chest, "Göğüs", new Vector3(0f, 1.32f, 0f), new Vector3(0.56f, 0.42f, 0.28f));
+            CreateHitboxPart(root.transform, health, HitGroup.Stomach, "Mide", new Vector3(0f, 1.02f, 0f), new Vector3(0.50f, 0.25f, 0.26f));
+            CreateHitboxPart(root.transform, health, HitGroup.LeftArm, "Sol Kol", new Vector3(-0.38f, 1.25f, 0f), new Vector3(0.18f, 0.58f, 0.20f));
+            CreateHitboxPart(root.transform, health, HitGroup.RightArm, "Sağ Kol", new Vector3(0.38f, 1.25f, 0f), new Vector3(0.18f, 0.58f, 0.20f));
+            CreateHitboxPart(root.transform, health, HitGroup.LeftLeg, "Sol Bacak", new Vector3(-0.15f, 0.52f, 0f), new Vector3(0.21f, 0.78f, 0.23f));
+            CreateHitboxPart(root.transform, health, HitGroup.RightLeg, "Sağ Bacak", new Vector3(0.15f, 0.52f, 0f), new Vector3(0.21f, 0.78f, 0.23f));
+        }
+
+        private static void CreateHitboxPart(
+            Transform parent,
+            Health health,
+            HitGroup hitGroup,
+            string partName,
+            Vector3 localPosition,
+            Vector3 localScale)
+        {
+            var part = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            part.name = partName;
+            part.transform.SetParent(parent, false);
+            part.transform.localPosition = localPosition;
+            part.transform.localScale = localScale;
+            part.AddComponent<PlayerHitbox>().Configure(health, hitGroup);
         }
     }
 }
