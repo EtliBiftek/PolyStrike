@@ -1,4 +1,3 @@
-using System;
 using UnityEngine;
 
 namespace PolyStrike.Gameplay
@@ -10,6 +9,7 @@ namespace PolyStrike.Gameplay
 
         private GrenadeType grenadeType;
         private Vector3 velocitySourceUnits;
+        private Vector3 spinDegreesPerSecond;
         private Transform owner;
         private float accumulator;
         private float elapsed;
@@ -25,6 +25,7 @@ namespace PolyStrike.Gameplay
             grenadeType = type;
             transform.position = spawnPosition;
             velocitySourceUnits = launchVelocitySourceUnits;
+            spinDegreesPerSecond = new Vector3(610f, 390f, 470f);
             owner = thrower;
             nextSmokeThink = GrenadeRules.SmokeArmTime;
         }
@@ -33,6 +34,8 @@ namespace PolyStrike.Gameplay
         {
             if (detonated)
                 return;
+
+            transform.Rotate(spinDegreesPerSecond * Time.deltaTime, Space.Self);
 
             accumulator = Mathf.Min(accumulator + Time.deltaTime, MaxSimulationCatchup);
             while (accumulator >= Substep && !detonated)
@@ -116,7 +119,14 @@ namespace PolyStrike.Gameplay
 
         private void ResolveCollision(RaycastHit hit)
         {
-            if (grenadeType == GrenadeType.Molotov)
+            var hitHealth = hit.collider.GetComponentInParent<Health>();
+            var hitPlayer = hitHealth != null && hitHealth.transform != owner;
+
+            if (hitPlayer)
+            {
+                hitHealth.TakeDamage(hitHealth.Armor > 0f ? 1f : 2f);
+            }
+            else if (grenadeType == GrenadeType.Molotov)
             {
                 var minimumFloorNormal = Mathf.Cos(GrenadeRules.MolotovMaxSlope * Mathf.Deg2Rad);
                 if (hit.normal.y >= minimumFloorNormal)
@@ -127,9 +137,10 @@ namespace PolyStrike.Gameplay
             }
 
             velocitySourceUnits = Vector3.Reflect(velocitySourceUnits, hit.normal) * GrenadeRules.BounceScale;
+            spinDegreesPerSecond *= GrenadeRules.BounceScale;
             GrenadeEffects.PlayBounce(transform.position, velocitySourceUnits.magnitude, ResolveSurface(hit.collider));
 
-            if (hit.normal.y > 0.1f && velocitySourceUnits.magnitude < GrenadeRules.RestSpeed)
+            if (!hitPlayer && hit.normal.y > 0.1f && velocitySourceUnits.magnitude < GrenadeRules.RestSpeed)
             {
                 velocitySourceUnits = Vector3.zero;
                 atRest = true;
