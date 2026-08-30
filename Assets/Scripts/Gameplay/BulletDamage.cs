@@ -1,3 +1,5 @@
+using UnityEngine;
+
 namespace PolyStrike.Gameplay
 {
     public readonly struct BulletDamage
@@ -6,13 +8,20 @@ namespace PolyStrike.Gameplay
         public float ArmorPenetration { get; }
         public float TaggingBaseVsM4 { get; }
         public HitGroup HitGroup { get; }
+        public Vector3 Direction { get; }
 
-        public BulletDamage(float damage, float armorPenetration, float taggingBaseVsM4, HitGroup hitGroup)
+        public BulletDamage(
+            float damage,
+            float armorPenetration,
+            float taggingBaseVsM4,
+            HitGroup hitGroup,
+            Vector3 direction)
         {
             Damage = damage;
             ArmorPenetration = armorPenetration;
             TaggingBaseVsM4 = taggingBaseVsM4;
             HitGroup = hitGroup;
+            Direction = direction.sqrMagnitude > 0.0001f ? direction.normalized : Vector3.forward;
         }
     }
 
