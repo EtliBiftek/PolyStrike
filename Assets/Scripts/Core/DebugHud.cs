@@ -56,6 +56,8 @@ namespace PolyStrike.Core
 
                 if (weapon.IsReloading)
                     GUI.Label(new Rect(Screen.width - 300f, Screen.height - 145f, 280f, 30f), Localization.Get("hud.reloading"), textStyle);
+                else if (weapon.IsDeploying)
+                    GUI.Label(new Rect(Screen.width - 300f, Screen.height - 145f, 280f, 30f), Localization.Get("hud.deploying"), textStyle);
             }
 
             GUI.Label(new Rect(Screen.width * 0.5f - 15f, Screen.height * 0.5f - 18f, 30f, 36f), "+", crosshairStyle);
