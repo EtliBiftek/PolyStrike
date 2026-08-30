@@ -2,6 +2,7 @@ using System.Collections;
 using PolyStrike.Audio;
 using PolyStrike.Core;
 using PolyStrike.Gameplay;
+using PolyStrike.Match;
 using UnityEngine;
 
 namespace PolyStrike.Player
@@ -21,6 +22,7 @@ namespace PolyStrike.Player
         private PlayerMovement movement;
         private HitscanWeapon weapon;
         private ViewmodelMotion viewmodel;
+        private MatchParticipant participant;
         private AudioSource handlingSource;
 
         private readonly int[] inventory = new int[4];
@@ -77,6 +79,20 @@ namespace PolyStrike.Player
             return true;
         }
 
+        public bool RefundGrenade(GrenadeType type, int countBeforePurchase)
+        {
+            var index = (int)type;
+            if (index < 0 || index >= inventory.Length || inventory[index] <= countBeforePurchase)
+                return false;
+
+            inventory[index]--;
+
+            if (utilityEquipped && selectedType == type && inventory[index] <= 0)
+                ForceHolster();
+
+            return true;
+        }
+
         public int GetCount(GrenadeType type)
         {
             return inventory[(int)type];
@@ -98,6 +114,7 @@ namespace PolyStrike.Player
 
         private void Awake()
         {
+            participant = GetComponent<MatchParticipant>();
             handlingSource = gameObject.AddComponent<AudioSource>();
             handlingSource.playOnAwake = false;
             handlingSource.spatialBlend = 0f;
@@ -316,7 +333,8 @@ namespace PolyStrike.Player
             else
                 renderer.material.color = color;
 
-            grenade.AddComponent<GrenadeProjectile>().Initialize(type, position, velocitySourceUnits, transform);
+            var incendiary = type == GrenadeType.Molotov && participant != null && participant.Team == MatchTeam.CounterTerrorists;
+            grenade.AddComponent<GrenadeProjectile>().Initialize(type, position, velocitySourceUnits, transform, incendiary);
         }
 
         private void Equip(GrenadeType type)
@@ -422,7 +440,7 @@ namespace PolyStrike.Player
                 case GrenadeType.Smoke:
                     return "Smoke Projectile";
                 case GrenadeType.Molotov:
-                    return "Molotov Projectile";
+                    return "Fire Grenade Projectile";
                 default:
                     return "Grenade Projectile";
             }
