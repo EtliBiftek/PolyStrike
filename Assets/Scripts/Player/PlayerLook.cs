@@ -6,6 +6,9 @@ namespace PolyStrike.Player
 {
     public sealed class PlayerLook : MonoBehaviour
     {
+        private const float AimPunchDecay = 18f;
+        private const float AimPunchSpring = 64f;
+
         [SerializeField] private Transform cameraTransform;
         [SerializeField] private float sensitivity = 0.085f;
         [SerializeField] private float standingEyeHeight = 1.62f;
@@ -131,8 +134,8 @@ namespace PolyStrike.Player
             }
 
             var deltaTime = Time.deltaTime;
-            aimPunchVelocity += -externalAimPunch * (42f * deltaTime);
-            aimPunchVelocity *= Mathf.Exp(-11f * deltaTime);
+            aimPunchVelocity += -externalAimPunch * (AimPunchSpring * deltaTime);
+            aimPunchVelocity *= Mathf.Exp(-AimPunchDecay * deltaTime);
             externalAimPunch += aimPunchVelocity * deltaTime;
             externalAimPunch = Vector2.ClampMagnitude(externalAimPunch, 90f);
         }
