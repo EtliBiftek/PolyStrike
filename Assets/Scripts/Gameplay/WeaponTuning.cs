@@ -25,6 +25,8 @@ namespace PolyStrike.Gameplay
         public float StandingRecoveryTime { get; private set; }
         public float CrouchingRecoveryTime { get; private set; }
         public float BaseSpread { get; private set; }
+        public bool Automatic { get; private set; }
+        public int KillReward { get; private set; }
         public Vector2[] SprayPattern { get; private set; }
 
         private WeaponTuning()
@@ -56,6 +58,8 @@ namespace PolyStrike.Gameplay
                 StandingRecoveryTime = 0.368f,
                 CrouchingRecoveryTime = 0.305f,
                 BaseSpread = 0.0006f,
+                Automatic = true,
+                KillReward = 300,
                 SprayPattern = new[]
                 {
                     new Vector2(0.00f, 0.00f), new Vector2(0.04f, 0.45f), new Vector2(-0.03f, 1.05f),
@@ -97,6 +101,8 @@ namespace PolyStrike.Gameplay
                 StandingRecoveryTime = 0.339f,
                 CrouchingRecoveryTime = 0.28f,
                 BaseSpread = 0.0006f,
+                Automatic = true,
+                KillReward = 300,
                 SprayPattern = new[]
                 {
                     new Vector2(0.00f, 0.00f), new Vector2(0.03f, 0.38f), new Vector2(-0.02f, 0.88f),
@@ -111,6 +117,80 @@ namespace PolyStrike.Gameplay
                     new Vector2(-2.10f, 8.83f), new Vector2(-1.20f, 8.88f), new Vector2(0.10f, 8.84f)
                 }
             };
+        }
+
+        public static WeaponTuning CreateTPistol()
+        {
+            return new WeaponTuning
+            {
+                DisplayNameKey = "weapon.t_pistol",
+                Damage = 30f,
+                RangeMeters = SourceUnit.ToMeters(4096f),
+                RangeModifier = 0.85f,
+                ArmorPenetration = 0.47f,
+                PenetrationPower = 1f,
+                TaggingBaseVsM4 = 0.36f,
+                RoundsPerMinute = 400f,
+                MagazineSize = 20,
+                ReserveAmmo = 120,
+                ReloadClipReadyTime = 1.45f,
+                ReloadFireReadyTime = 2.17f,
+                DeployTime = 1.10f,
+                MaxMoveSpeedSourceUnits = 240f,
+                StandingInaccuracy = 0.0056f,
+                CrouchingInaccuracy = 0.0042f,
+                MovingInaccuracy = 0.010f,
+                FireInaccuracy = 0.010f,
+                StandingRecoveryTime = 0.20f,
+                CrouchingRecoveryTime = 0.18f,
+                BaseSpread = 0.001f,
+                Automatic = false,
+                KillReward = 300,
+                SprayPattern = BuildPistolPattern(0.34f, 0.09f, 20)
+            };
+        }
+
+        public static WeaponTuning CreateCTPistol()
+        {
+            return new WeaponTuning
+            {
+                DisplayNameKey = "weapon.ct_pistol",
+                Damage = 35f,
+                RangeMeters = SourceUnit.ToMeters(4096f),
+                RangeModifier = 0.91f,
+                ArmorPenetration = 0.505f,
+                PenetrationPower = 1f,
+                TaggingBaseVsM4 = 0.36f,
+                RoundsPerMinute = 353f,
+                MagazineSize = 12,
+                ReserveAmmo = 24,
+                ReloadClipReadyTime = 1.45f,
+                ReloadFireReadyTime = 2.17f,
+                DeployTime = 1.00f,
+                MaxMoveSpeedSourceUnits = 240f,
+                StandingInaccuracy = 0.0049f,
+                CrouchingInaccuracy = 0.0037f,
+                MovingInaccuracy = 0.014f,
+                FireInaccuracy = 0.0085f,
+                StandingRecoveryTime = 0.35f,
+                CrouchingRecoveryTime = 0.30f,
+                BaseSpread = 0.0008f,
+                Automatic = false,
+                KillReward = 300,
+                SprayPattern = BuildPistolPattern(0.48f, 0.035f, 12)
+            };
+        }
+
+        private static Vector2[] BuildPistolPattern(float verticalStep, float horizontalStep, int count)
+        {
+            var pattern = new Vector2[count];
+            for (var i = 0; i < count; i++)
+            {
+                var horizontal = Mathf.Sin(i * 2.31f) * horizontalStep * i;
+                pattern[i] = new Vector2(horizontal, verticalStep * i);
+            }
+
+            return pattern;
         }
     }
 }
