@@ -18,15 +18,21 @@ namespace PolyStrike.Player
         [SerializeField] private float returnSpeed = 16f;
 
         private PlayerMovement movement;
+        private Renderer[] weaponRenderers;
+        private GameObject utilityModel;
+        private Renderer utilityRenderer;
         private Vector3 recoilPosition;
         private Vector3 recoilRotation;
         private float deployUntil;
         private float deployDuration = 1f;
         private float bobTime;
+        private bool utilityMode;
 
         private void Awake()
         {
             movement = GetComponentInParent<PlayerMovement>();
+            weaponRenderers = GetComponentsInChildren<Renderer>(true);
+            CreateUtilityModel();
         }
 
         public void PlayShot(Vector2 recoilStep)
@@ -45,6 +51,23 @@ namespace PolyStrike.Player
         {
             recoilPosition += new Vector3(0.012f, -0.015f, -0.018f);
             recoilRotation += new Vector3(2.5f, -2f, 4f);
+        }
+
+        public void SetUtilityMode(bool enabled, GrenadeType type = GrenadeType.HighExplosive)
+        {
+            utilityMode = enabled;
+
+            for (var i = 0; i < weaponRenderers.Length; i++)
+            {
+                if (weaponRenderers[i] != null)
+                    weaponRenderers[i].enabled = !enabled;
+            }
+
+            if (utilityModel != null)
+                utilityModel.SetActive(enabled);
+
+            if (enabled)
+                ApplyUtilityAppearance(type);
         }
 
         private void LateUpdate()
@@ -79,8 +102,48 @@ namespace PolyStrike.Player
             recoilPosition = Vector3.Lerp(recoilPosition, Vector3.zero, 1f - Mathf.Exp(-returnSpeed * Time.deltaTime));
             recoilRotation = Vector3.Lerp(recoilRotation, Vector3.zero, 1f - Mathf.Exp(-returnSpeed * 0.8f * Time.deltaTime));
 
-            transform.localPosition = basePosition + bob + sway + recoilPosition + deployOffset;
-            transform.localRotation = Quaternion.Euler(baseRotation + swayAngles + recoilRotation + deployAngles);
+            var modePosition = utilityMode ? new Vector3(-0.02f, -0.10f, 0.30f) : basePosition;
+            var modeRotation = utilityMode ? new Vector3(10f, 2f, -4f) : baseRotation;
+            transform.localPosition = modePosition + bob * (utilityMode ? 0.72f : 1f) + sway + recoilPosition + deployOffset;
+            transform.localRotation = Quaternion.Euler(modeRotation + swayAngles + recoilRotation + deployAngles);
+        }
+
+        private void CreateUtilityModel()
+        {
+            utilityModel = GameObject.CreatePrimitive(PrimitiveType.Sphere);
+            utilityModel.name = "Utility Viewmodel";
+            utilityModel.layer = gameObject.layer;
+            utilityModel.transform.SetParent(transform, false);
+            utilityModel.transform.localPosition = new Vector3(0.06f, -0.02f, 0.06f);
+            utilityModel.transform.localScale = new Vector3(0.095f, 0.11f, 0.095f);
+
+            var collider = utilityModel.GetComponent<Collider>();
+            if (collider != null)
+                Destroy(collider);
+
+            utilityRenderer = utilityModel.GetComponent<Renderer>();
+            utilityRenderer.material = new Material(Shader.Find("Universal Render Pipeline/Lit") ?? Shader.Find("Standard"));
+            utilityModel.SetActive(false);
+        }
+
+        private void ApplyUtilityAppearance(GrenadeType type)
+        {
+            if (utilityRenderer == null)
+                return;
+
+            var color = type switch
+            {
+                GrenadeType.HighExplosive => new Color(0.22f, 0.28f, 0.16f),
+                GrenadeType.Flashbang => new Color(0.62f, 0.64f, 0.66f),
+                GrenadeType.Smoke => new Color(0.25f, 0.36f, 0.29f),
+                GrenadeType.Molotov => new Color(0.42f, 0.20f, 0.08f),
+                _ => Color.gray
+            };
+
+            if (utilityRenderer.material.HasProperty("_BaseColor"))
+                utilityRenderer.material.SetColor("_BaseColor", color);
+            else
+                utilityRenderer.material.color = color;
         }
     }
 }
