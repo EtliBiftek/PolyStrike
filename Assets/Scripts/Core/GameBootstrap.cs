@@ -55,18 +55,20 @@ namespace PolyStrike.Core
             player.transform.position = new Vector3(0f, 0.05f, -7f);
 
             var controller = player.AddComponent<CharacterController>();
-            controller.radius = 0.35f;
-            controller.stepOffset = 0.3f;
-            controller.slopeLimit = 50f;
+            controller.radius = SourceUnit.ToMeters(16f);
+            controller.height = SourceUnit.ToMeters(72f);
+            controller.stepOffset = SourceUnit.ToMeters(18f);
+            controller.slopeLimit = 45.6f;
+            controller.skinWidth = 0.03f;
 
             player.AddComponent<Health>();
-            player.AddComponent<PlayerMovement>();
+            var movement = player.AddComponent<PlayerMovement>();
             var look = player.AddComponent<PlayerLook>();
 
             var cameraObject = new GameObject("Oyuncu Kamerası");
             cameraObject.tag = "MainCamera";
             cameraObject.transform.SetParent(player.transform, false);
-            cameraObject.transform.localPosition = new Vector3(0f, 1.62f, 0f);
+            cameraObject.transform.localPosition = new Vector3(0f, SourceUnit.ToMeters(64f), 0f);
 
             var camera = cameraObject.AddComponent<Camera>();
             camera.fieldOfView = 75f;
@@ -76,7 +78,8 @@ namespace PolyStrike.Core
             look.SetCamera(cameraObject.transform);
 
             var weapon = cameraObject.AddComponent<HitscanWeapon>();
-            weapon.SetCamera(camera);
+            weapon.SetReferences(camera, look, movement);
+            movement.SetHeldWeapon(weapon);
 
             player.AddComponent<DebugHud>();
         }
