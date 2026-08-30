@@ -28,6 +28,7 @@ namespace PolyStrike.Gameplay
         private float deployUntil;
         private float lastShotTime = -10f;
         private bool isReloading;
+        private bool externalInputBlocked;
 
         private WeaponTuning Profile => profiles[activeProfileIndex];
 
@@ -45,6 +46,17 @@ namespace PolyStrike.Gameplay
             playerLook = look;
             movement = playerMovement;
             viewmodel = viewmodelMotion;
+        }
+
+        public void SetExternalInputBlocked(bool blocked)
+        {
+            externalInputBlocked = blocked;
+
+            if (!blocked || !isReloading)
+                return;
+
+            StopAllCoroutines();
+            isReloading = false;
         }
 
         private void Awake()
@@ -86,6 +98,9 @@ namespace PolyStrike.Gameplay
 
             if (Time.time - lastShotTime > Mathf.Max(0.35f, Profile.StandingRecoveryTime))
                 sprayIndex = 0;
+
+            if (externalInputBlocked)
+                return;
 
             if (GameInput.ReloadPressed)
                 TryStartReload();
@@ -145,11 +160,14 @@ namespace PolyStrike.Gameplay
                 if (!Physics.Raycast(traceOrigin, direction, out var hit, remainingRange, hitMask, QueryTriggerInteraction.Ignore))
                 {
                     tracerEnd = traceOrigin + direction * remainingRange;
+                    SmokeCloud.PunchLine(traceOrigin, tracerEnd);
                     feedback?.PlayTracer(tracerEnd);
                     return;
                 }
 
                 tracerEnd = hit.point;
+                SmokeCloud.PunchLine(traceOrigin, hit.point);
+
                 var airDistanceUnits = SourceUnit.ToSourceUnits(hit.distance);
                 currentDamage *= Mathf.Pow(Profile.RangeModifier, airDistanceUnits / 500f);
                 remainingRange -= hit.distance;
