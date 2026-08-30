@@ -217,10 +217,12 @@ namespace PolyStrike.Player
 
         private Vector3 ResolveSpawnPoint(Vector3 origin, Vector3 direction, float maxDistance)
         {
-            var hits = Physics.SphereCastAll(
+            var halfExtent = SourceUnit.ToMeters(GrenadeRules.ProjectileHalfExtent);
+            var hits = Physics.BoxCastAll(
                 origin,
-                SourceUnit.ToMeters(GrenadeRules.ProjectileRadius),
+                Vector3.one * halfExtent,
                 direction,
+                Quaternion.identity,
                 maxDistance,
                 ~0,
                 QueryTriggerInteraction.Ignore);
