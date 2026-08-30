@@ -1,4 +1,5 @@
 using System.Collections;
+using PolyStrike.Audio;
 using PolyStrike.Core;
 using PolyStrike.Gameplay;
 using UnityEngine;
@@ -11,6 +12,7 @@ namespace PolyStrike.Player
         private PlayerMovement movement;
         private HitscanWeapon weapon;
         private ViewmodelMotion viewmodel;
+        private AudioSource handlingSource;
 
         private readonly int[] inventory = { 1, 1, 1, 1 };
         private GrenadeType selectedType;
@@ -31,6 +33,14 @@ namespace PolyStrike.Player
             movement = playerMovement;
             weapon = hitscanWeapon;
             viewmodel = viewmodelMotion;
+        }
+
+        private void Awake()
+        {
+            handlingSource = gameObject.AddComponent<AudioSource>();
+            handlingSource.playOnAwake = false;
+            handlingSource.spatialBlend = 0f;
+            handlingSource.dopplerLevel = 0f;
         }
 
         private void Update()
@@ -76,6 +86,7 @@ namespace PolyStrike.Player
             {
                 primed = true;
                 armedStrength = GetStrength(primary, secondary);
+                handlingSource.PlayOneShot(UtilitySfxBank.PinPull(selectedType), 0.78f);
             }
 
             if (!primed)
@@ -90,6 +101,7 @@ namespace PolyStrike.Player
             var type = selectedType;
             var strength = armedStrength;
             primed = false;
+            handlingSource.PlayOneShot(UtilitySfxBank.Throw(type), 0.72f);
             StartCoroutine(ThrowAfterConstructionDelay(type, strength));
         }
 
@@ -192,6 +204,7 @@ namespace PolyStrike.Player
             movement?.SetExternalMaxSpeed(GrenadeRules.EquippedMoveSpeed);
             viewmodel?.SetUtilityMode(true, selectedType);
             viewmodel?.PlayDeploy(0.72f);
+            handlingSource.PlayOneShot(UtilitySfxBank.Draw(type), 0.62f);
         }
 
         private void UnequipUtility()
