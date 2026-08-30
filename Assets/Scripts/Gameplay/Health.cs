@@ -10,8 +10,8 @@ namespace PolyStrike.Gameplay
         private const float HeArmorRatio = 0.60f;
 
         [SerializeField] private float maxHealth = 100f;
-        [SerializeField] private float startingArmor = 100f;
-        [SerializeField] private bool hasHelmet = true;
+        [SerializeField] private float startingArmor;
+        [SerializeField] private bool hasHelmet;
         [SerializeField] private bool disableOnDeath = true;
 
         private PlayerMovement movement;
@@ -28,6 +28,7 @@ namespace PolyStrike.Gameplay
         public event Action<float, float> Changed;
         public event Action<float> ArmorChanged;
         public event Action Died;
+        public event Action RoundReset;
 
         private void Awake()
         {
@@ -106,10 +107,31 @@ namespace PolyStrike.Gameplay
             Changed?.Invoke(Current, maxHealth);
         }
 
+        public void ResetForRound(bool clearEquipment)
+        {
+            IsDead = false;
+            Current = maxHealth;
+            LastBulletDirection = Vector3.zero;
+            LastHitGroup = HitGroup.Chest;
+
+            if (clearEquipment)
+            {
+                Armor = 0f;
+                hasHelmet = false;
+            }
+
+            Changed?.Invoke(Current, maxHealth);
+            ArmorChanged?.Invoke(Armor);
+            RoundReset?.Invoke();
+
+            if (!gameObject.activeSelf)
+                gameObject.SetActive(true);
+        }
+
         public void SetEquipment(float armor, bool helmet)
         {
             Armor = Mathf.Clamp(armor, 0f, 100f);
-            hasHelmet = helmet;
+            hasHelmet = Armor > 0f && helmet;
             ArmorChanged?.Invoke(Armor);
         }
 
@@ -140,6 +162,8 @@ namespace PolyStrike.Gameplay
 
             Current = Mathf.Max(0f, Current - dealt);
             Armor = Mathf.Max(0f, Armor - armorSpent);
+            if (Armor <= 0f)
+                hasHelmet = false;
 
             Changed?.Invoke(Current, maxHealth);
             if (armorSpent > 0)
@@ -158,6 +182,9 @@ namespace PolyStrike.Gameplay
 
         private void Die()
         {
+            if (IsDead)
+                return;
+
             IsDead = true;
             Died?.Invoke();
 
