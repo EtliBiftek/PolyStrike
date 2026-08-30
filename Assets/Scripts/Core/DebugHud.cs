@@ -7,6 +7,8 @@ namespace PolyStrike.Core
 {
     public sealed class DebugHud : MonoBehaviour
     {
+        private const float C4AudibleDistance = 28f;
+
         private Health health;
         private HitscanWeapon weapon;
         private PlayerMovement movement;
@@ -17,6 +19,8 @@ namespace PolyStrike.Core
         private GUIStyle textStyle;
         private GUIStyle centerStyle;
         private GUIStyle crosshairStyle;
+        private float nextBombPreviewUpdate;
+        private int predictedBombDamage;
 
         private void Awake()
         {
@@ -47,9 +51,12 @@ namespace PolyStrike.Core
             {
                 GUI.Label(new Rect(20f, Screen.height - 55f, 170f, 30f), string.Format(Localization.Get("hud.health"), Mathf.CeilToInt(health.Current)), textStyle);
                 GUI.Label(new Rect(175f, Screen.height - 55f, 170f, 30f), string.Format(Localization.Get("hud.armor"), Mathf.CeilToInt(health.Armor)), textStyle);
+                DrawBombDamagePreview();
             }
 
-            if (utility != null && utility.IsEquipped)
+            if (c4 != null && c4.IsBombEquipped)
+                DrawBombEquipment();
+            else if (utility != null && utility.IsEquipped)
                 DrawUtility();
             else if (weapon != null)
                 DrawWeapon();
@@ -93,6 +100,54 @@ namespace PolyStrike.Core
                     : string.Format(Localization.Get("match.winner"), Localization.Get(match.MatchWinner == MatchTeam.Terrorists ? "team.t" : "team.ct"));
                 GUI.Label(new Rect(Screen.width * 0.5f - 300f, 110f, 600f, 34f), result, centerStyle);
             }
+        }
+
+        private void DrawBombDamagePreview()
+        {
+            var match = MatchRoundManager.Instance;
+            var bomb = C4Controller.PlantedBombTransform;
+            if (match == null || match.Phase != RoundPhase.PostPlant || bomb == null)
+            {
+                predictedBombDamage = 0;
+                return;
+            }
+
+            if (Vector3.Distance(transform.position, bomb.position) > C4AudibleDistance)
+            {
+                predictedBombDamage = 0;
+                return;
+            }
+
+            if (Time.unscaledTime >= nextBombPreviewUpdate)
+            {
+                nextBombPreviewUpdate = Time.unscaledTime + 0.5f;
+                predictedBombDamage = C4ShockwaveDamageField.EstimateDamage(bomb.position, transform.position);
+            }
+
+            if (predictedBombDamage <= 0)
+                return;
+
+            var damage = Mathf.Min(predictedBombDamage, Mathf.CeilToInt(health.Current));
+            var healthFraction = Mathf.Clamp01(health.Current / Mathf.Max(health.Max, 1f));
+            var damageFraction = Mathf.Clamp01(damage / Mathf.Max(health.Max, 1f));
+            var bar = new Rect(20f, Screen.height - 23f, 220f, 7f);
+
+            var previousColor = GUI.color;
+            GUI.color = new Color(0.16f, 0.16f, 0.16f, 0.95f);
+            GUI.DrawTexture(bar, Texture2D.whiteTexture);
+            GUI.color = new Color(0.78f, 0.78f, 0.30f, 0.95f);
+            GUI.DrawTexture(new Rect(bar.x, bar.y, bar.width * healthFraction, bar.height), Texture2D.whiteTexture);
+            GUI.color = new Color(0.82f, 0.18f, 0.14f, 0.95f);
+            GUI.DrawTexture(new Rect(bar.x + bar.width * Mathf.Max(0f, healthFraction - damageFraction), bar.y, bar.width * damageFraction, bar.height), Texture2D.whiteTexture);
+            GUI.color = previousColor;
+
+            GUI.Label(new Rect(250f, Screen.height - 31f, 240f, 24f), string.Format(Localization.Get("hud.bomb_damage_preview"), damage), textStyle);
+        }
+
+        private void DrawBombEquipment()
+        {
+            GUI.Label(new Rect(Screen.width - 320f, Screen.height - 85f, 300f, 30f), Localization.Get("hud.c4_equipped"), textStyle);
+            GUI.Label(new Rect(Screen.width - 320f, Screen.height - 55f, 300f, 30f), Localization.Get("hud.c4_hint"), textStyle);
         }
 
         private void DrawC4Interaction()
