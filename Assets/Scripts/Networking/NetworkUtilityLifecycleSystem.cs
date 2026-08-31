@@ -5,7 +5,7 @@ using Unity.NetCode;
 namespace PolyStrike.Networking
 {
     [WorldSystemFilter(WorldSystemFilterFlags.ServerSimulation)]
-    [UpdateInGroup(typeof(ServerSimulationSystemGroup), OrderLast = true)]
+    [UpdateInGroup(typeof(SimulationSystemGroup), OrderLast = true)]
     public partial struct NetworkUtilityLifecycleSystem : ISystem
     {
         private EntityQuery playerQuery;
