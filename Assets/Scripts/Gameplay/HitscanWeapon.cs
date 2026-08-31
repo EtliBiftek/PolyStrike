@@ -511,7 +511,7 @@ namespace PolyStrike.Gameplay
 
         private void TryStartReload()
         {
-            if (isReloading || IsDeploying || AmmoInMagazine >= Profile.MagazineSize || ReserveAmmo <= 0)
+            if (isReloading || IsDeploying || AmmoInMagazine >= Profile.MagazineSize || ReserveAmmo < Profile.MagazineSize)
                 return;
 
             StartCoroutine(Reload(activeProfileIndex));
@@ -532,10 +532,8 @@ namespace PolyStrike.Gameplay
                 yield break;
             }
 
-            var needed = profile.MagazineSize - magazineAmmo[profileIndex];
-            var loaded = Mathf.Min(needed, reserveAmmo[profileIndex]);
-            magazineAmmo[profileIndex] += loaded;
-            reserveAmmo[profileIndex] -= loaded;
+            magazineAmmo[profileIndex] = profile.MagazineSize;
+            reserveAmmo[profileIndex] -= profile.MagazineSize;
             feedback?.PlayReloadInsert(AudioStyle);
 
             var tail = Mathf.Max(0f, profile.ReloadFireReadyTime - profile.ReloadClipReadyTime);
