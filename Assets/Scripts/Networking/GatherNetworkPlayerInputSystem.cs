@@ -18,10 +18,10 @@ namespace PolyStrike.Networking
             var move = GameInput.Movement;
             var look = GameInput.MouseDelta;
             var jump = GameInput.JumpPressed;
-            var crouch = GameInput.CrouchHeld;
-            var fire = GameInput.FireHeld;
-            var secondaryFire = GameInput.SecondaryFireHeld;
             var reload = GameInput.ReloadPressed;
+            var crouch = GameInput.CrouchHeld ? (byte)1 : (byte)0;
+            var fire = GameInput.FireHeld ? (byte)1 : (byte)0;
+            var secondaryFire = GameInput.SecondaryFireHeld ? (byte)1 : (byte)0;
             var slot = ResolveWeaponSlot();
 
             Entities
@@ -30,16 +30,13 @@ namespace PolyStrike.Networking
                 {
                     input.Move = new float2(move.x, move.y);
                     input.Look = new float2(look.x, look.y);
+                    input.CrouchHeld = crouch;
+                    input.FireHeld = fire;
+                    input.SecondaryFireHeld = secondaryFire;
                     input.WeaponSlot = slot;
 
                     if (jump)
                         input.Jump.Set();
-                    if (crouch)
-                        input.Crouch.Set();
-                    if (fire)
-                        input.Fire.Set();
-                    if (secondaryFire)
-                        input.SecondaryFire.Set();
                     if (reload)
                         input.Reload.Set();
                 })
