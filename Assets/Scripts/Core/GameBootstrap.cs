@@ -1,4 +1,6 @@
+using PolyStrike.AI;
 using PolyStrike.Gameplay;
+using PolyStrike.Maps;
 using PolyStrike.Match;
 using PolyStrike.Player;
 using UnityEngine;
@@ -17,9 +19,9 @@ namespace PolyStrike.Core
 
             CreateLighting();
             GrenadeEffects.EnsureExists();
-            CreateArena();
+            SandlineMap.Build();
             CreatePlayer();
-            CreateTargets();
+            CreateBots();
             CreateMatchManager();
         }
 
@@ -31,76 +33,27 @@ namespace PolyStrike.Core
             var lightObject = new GameObject("Güneş");
             var light = lightObject.AddComponent<Light>();
             light.type = LightType.Directional;
-            light.intensity = 1.1f;
-            lightObject.transform.rotation = Quaternion.Euler(50f, -30f, 0f);
-        }
+            light.intensity = 1.15f;
+            light.color = new Color(1f, 0.92f, 0.78f);
+            lightObject.transform.rotation = Quaternion.Euler(48f, -28f, 0f);
 
-        private static void CreateArena()
-        {
-            var floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
-            floor.name = "Zemin";
-            floor.transform.localScale = new Vector3(5f, 1f, 5f);
-            floor.AddComponent<PenetrableSurface>().Configure(SurfaceMaterial.Concrete);
-
-            CreateBlock(new Vector3(0f, 1.5f, 15f), new Vector3(30f, 3f, 1f), SurfaceMaterial.Concrete);
-            CreateBlock(new Vector3(-15f, 1.5f, 0f), new Vector3(1f, 3f, 30f), SurfaceMaterial.Concrete);
-            CreateBlock(new Vector3(15f, 1.5f, 0f), new Vector3(1f, 3f, 30f), SurfaceMaterial.Concrete);
-
-            CreateBlock(new Vector3(-3f, 1.05f, 6f), new Vector3(2.4f, 2.1f, 0.14f), SurfaceMaterial.Wood, "Ahşap Test Paneli");
-            CreateBlock(new Vector3(3f, 1.05f, 7f), new Vector3(2.4f, 2.1f, 0.08f), SurfaceMaterial.Metal, "Metal Test Paneli");
-            CreateBlock(new Vector3(0f, 1.05f, 5f), new Vector3(2.4f, 2.1f, 0.05f), SurfaceMaterial.Glass, "Cam Test Paneli");
-
-            CreateBlock(new Vector3(-6f, 0.035f, -2f), new Vector3(3f, 0.07f, 3f), SurfaceMaterial.Metal, "Metal Yürüyüş Alanı");
-            CreateBlock(new Vector3(-2.5f, 0.035f, -2f), new Vector3(3f, 0.07f, 3f), SurfaceMaterial.Wood, "Ahşap Yürüyüş Alanı");
-            CreateBlock(new Vector3(2.5f, 0.035f, -2f), new Vector3(3f, 0.07f, 3f), SurfaceMaterial.Plastic, "Plastik Yürüyüş Alanı");
-
-            CreateBombSite("A", new Vector3(-8f, 0.06f, 9f));
-            CreateBombSite("B", new Vector3(8f, 0.06f, 9f));
-        }
-
-        private static void CreateBlock(Vector3 position, Vector3 scale, SurfaceMaterial material, string objectName = "Duvar")
-        {
-            var block = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            block.name = objectName;
-            block.transform.position = position;
-            block.transform.localScale = scale;
-            block.AddComponent<PenetrableSurface>().Configure(material);
-        }
-
-        private static void CreateBombSite(string id, Vector3 position)
-        {
-            var site = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            site.name = $"Bomb Site {id}";
-            site.transform.position = position;
-            site.transform.localScale = new Vector3(4.5f, 0.10f, 4.5f);
-
-            var renderer = site.GetComponent<Renderer>();
-            var material = renderer.material;
-            if (material.HasProperty("_BaseColor"))
-                material.SetColor("_BaseColor", id == "A" ? new Color(0.55f, 0.30f, 0.08f) : new Color(0.14f, 0.32f, 0.55f));
-            else
-                material.color = id == "A" ? new Color(0.55f, 0.30f, 0.08f) : new Color(0.14f, 0.32f, 0.55f);
-
-            site.AddComponent<BombSite>().Configure(id);
+            RenderSettings.ambientLight = new Color(0.38f, 0.35f, 0.31f);
         }
 
         private static void CreatePlayer()
         {
+            var tRotation = Quaternion.Euler(0f, 0f, 0f);
+            var ctRotation = Quaternion.Euler(0f, 180f, 0f);
             var player = new GameObject("Oyuncu");
-            player.transform.position = new Vector3(0f, 0.05f, -7f);
+            player.transform.SetPositionAndRotation(SandlineMap.TSpawns[0], tRotation);
 
-            var controller = player.AddComponent<CharacterController>();
-            controller.radius = SourceUnit.ToMeters(16f);
-            controller.height = SourceUnit.ToMeters(72f);
-            controller.stepOffset = SourceUnit.ToMeters(18f);
-            controller.slopeLimit = 45.6f;
-            controller.skinWidth = 0.03f;
-
+            var controller = ConfigureCharacterController(player);
             var health = player.AddComponent<Health>();
             health.SetDisableOnDeath(false);
 
             var participant = player.AddComponent<MatchParticipant>();
             participant.Configure(MatchTeam.Terrorists, true);
+            participant.ConfigureTeamSpawns(SandlineMap.TSpawns[0], tRotation, SandlineMap.CTSpawns[0], ctRotation);
 
             var movement = player.AddComponent<PlayerMovement>();
             var look = player.AddComponent<PlayerLook>();
@@ -141,6 +94,92 @@ namespace PolyStrike.Core
             player.AddComponent<C4Controller>();
             player.AddComponent<BuyMenu>();
             player.AddComponent<DebugHud>();
+
+            // Keep a reference alive in generated-scene builds; CharacterController is configured above.
+            _ = controller;
+        }
+
+        private static void CreateBots()
+        {
+            for (var slot = 1; slot < 5; slot++)
+                CreateBot(MatchTeam.Terrorists, slot);
+
+            for (var slot = 0; slot < 5; slot++)
+                CreateBot(MatchTeam.CounterTerrorists, slot);
+        }
+
+        private static void CreateBot(MatchTeam initialTeam, int slot)
+        {
+            var tRotation = Quaternion.Euler(0f, 0f, 0f);
+            var ctRotation = Quaternion.Euler(0f, 180f, 0f);
+            var start = initialTeam == MatchTeam.Terrorists ? SandlineMap.TSpawns[slot] : SandlineMap.CTSpawns[slot];
+            var rotation = initialTeam == MatchTeam.Terrorists ? tRotation : ctRotation;
+
+            var root = new GameObject($"Bot {initialTeam} {slot + 1}");
+            root.transform.SetPositionAndRotation(start, rotation);
+            ConfigureCharacterController(root);
+
+            var health = root.AddComponent<Health>();
+            health.SetDisableOnDeath(false);
+
+            var participant = root.AddComponent<MatchParticipant>();
+            participant.Configure(initialTeam, false);
+            participant.ConfigureTeamSpawns(SandlineMap.TSpawns[slot], tRotation, SandlineMap.CTSpawns[slot], ctRotation);
+
+            var movement = root.AddComponent<PlayerMovement>();
+            root.AddComponent<PlayerFootstepAudio>();
+
+            var weapon = root.AddComponent<HitscanWeapon>();
+            weapon.SetReferences(null, null, movement, null);
+            weapon.SetExternalInputBlocked(true);
+            movement.SetHeldWeapon(weapon);
+            participant.SetLoadoutReferences(weapon, null);
+
+            CreateBotVisual(root.transform, initialTeam);
+            var bot = root.AddComponent<TacticalBotController>();
+            bot.Configure(slot);
+        }
+
+        private static CharacterController ConfigureCharacterController(GameObject root)
+        {
+            var controller = root.AddComponent<CharacterController>();
+            controller.radius = SourceUnit.ToMeters(16f);
+            controller.height = SourceUnit.ToMeters(72f);
+            controller.stepOffset = SourceUnit.ToMeters(18f);
+            controller.slopeLimit = 45.6f;
+            controller.skinWidth = 0.03f;
+            return controller;
+        }
+
+        private static void CreateBotVisual(Transform parent, MatchTeam team)
+        {
+            var color = team == MatchTeam.Terrorists
+                ? new Color(0.45f, 0.29f, 0.16f)
+                : new Color(0.18f, 0.30f, 0.43f);
+
+            CreateVisualPart(parent, "Gövde", new Vector3(0f, 1.08f, 0f), new Vector3(0.54f, 0.76f, 0.34f), color);
+            CreateVisualPart(parent, "Kafa", new Vector3(0f, 1.64f, 0f), new Vector3(0.30f, 0.30f, 0.30f), color * 1.12f);
+            CreateVisualPart(parent, "Sol Bacak", new Vector3(-0.14f, 0.48f, 0f), new Vector3(0.20f, 0.72f, 0.22f), color * 0.82f);
+            CreateVisualPart(parent, "Sağ Bacak", new Vector3(0.14f, 0.48f, 0f), new Vector3(0.20f, 0.72f, 0.22f), color * 0.82f);
+        }
+
+        private static void CreateVisualPart(Transform parent, string name, Vector3 localPosition, Vector3 scale, Color color)
+        {
+            var part = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            part.name = name;
+            part.transform.SetParent(parent, false);
+            part.transform.localPosition = localPosition;
+            part.transform.localScale = scale;
+
+            var collider = part.GetComponent<Collider>();
+            if (collider != null)
+                Object.Destroy(collider);
+
+            var renderer = part.GetComponent<Renderer>();
+            if (renderer.material.HasProperty("_BaseColor"))
+                renderer.material.SetColor("_BaseColor", color);
+            else
+                renderer.material.color = color;
         }
 
         private static ViewmodelMotion CreateViewmodel(Transform cameraParent, Camera worldCamera, out Transform muzzle)
@@ -193,89 +232,6 @@ namespace PolyStrike.Core
             var collider = part.GetComponent<Collider>();
             if (collider != null)
                 Object.Destroy(collider);
-        }
-
-        private static void CreateTargets()
-        {
-            var positions = new[]
-            {
-                new Vector3(-6f, 0f, 7f),
-                new Vector3(-3f, 0f, 10f),
-                new Vector3(0f, 0f, 8f),
-                new Vector3(3f, 0f, 11f),
-                new Vector3(6f, 0f, 7f)
-            };
-
-            for (var i = 0; i < positions.Length; i++)
-                CreateTarget($"Hedef {i + 1}", positions[i]);
-        }
-
-        private static void CreateTarget(string targetName, Vector3 position)
-        {
-            var root = new GameObject(targetName);
-            root.transform.position = position;
-
-            var health = root.AddComponent<Health>();
-            health.SetDisableOnDeath(false);
-
-            var participant = root.AddComponent<MatchParticipant>();
-            participant.Configure(MatchTeam.CounterTerrorists, false);
-
-            var head = CreateHitboxPart(root.transform, health, HitGroup.Head, "Kafa", new Vector3(0f, 1.66f, 0f), new Vector3(0.30f, 0.30f, 0.30f), 3.5f);
-            var chest = CreateHitboxPart(root.transform, health, HitGroup.Chest, "Göğüs", new Vector3(0f, 1.32f, 0f), new Vector3(0.56f, 0.42f, 0.28f), 18f);
-            var stomach = CreateHitboxPart(root.transform, health, HitGroup.Stomach, "Mide", new Vector3(0f, 1.02f, 0f), new Vector3(0.50f, 0.25f, 0.26f), 12f);
-            var leftArm = CreateHitboxPart(root.transform, health, HitGroup.LeftArm, "Sol Kol", new Vector3(-0.38f, 1.25f, 0f), new Vector3(0.18f, 0.58f, 0.20f), 4f);
-            var rightArm = CreateHitboxPart(root.transform, health, HitGroup.RightArm, "Sağ Kol", new Vector3(0.38f, 1.25f, 0f), new Vector3(0.18f, 0.58f, 0.20f), 4f);
-            var leftLeg = CreateHitboxPart(root.transform, health, HitGroup.LeftLeg, "Sol Bacak", new Vector3(-0.15f, 0.52f, 0f), new Vector3(0.21f, 0.78f, 0.23f), 8f);
-            var rightLeg = CreateHitboxPart(root.transform, health, HitGroup.RightLeg, "Sağ Bacak", new Vector3(0.15f, 0.52f, 0f), new Vector3(0.21f, 0.78f, 0.23f), 8f);
-
-            ConnectRagdollPart(head, chest, 20f, 28f);
-            ConnectRagdollPart(stomach, chest, 18f, 24f);
-            ConnectRagdollPart(leftArm, chest, 38f, 55f);
-            ConnectRagdollPart(rightArm, chest, 38f, 55f);
-            ConnectRagdollPart(leftLeg, stomach, 24f, 38f);
-            ConnectRagdollPart(rightLeg, stomach, 24f, 38f);
-
-            root.AddComponent<RagdollDeath>();
-        }
-
-        private static Rigidbody CreateHitboxPart(
-            Transform parent,
-            Health health,
-            HitGroup hitGroup,
-            string partName,
-            Vector3 localPosition,
-            Vector3 localScale,
-            float mass)
-        {
-            var part = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            part.name = partName;
-            part.transform.SetParent(parent, false);
-            part.transform.localPosition = localPosition;
-            part.transform.localScale = localScale;
-            part.AddComponent<PlayerHitbox>().Configure(health, hitGroup);
-
-            var body = part.AddComponent<Rigidbody>();
-            body.mass = mass;
-            body.isKinematic = true;
-            body.useGravity = false;
-            body.collisionDetectionMode = CollisionDetectionMode.ContinuousSpeculative;
-
-            part.AddComponent<HitReaction>();
-            return body;
-        }
-
-        private static void ConnectRagdollPart(Rigidbody body, Rigidbody connectedBody, float twist, float swing)
-        {
-            var joint = body.gameObject.AddComponent<CharacterJoint>();
-            joint.connectedBody = connectedBody;
-            joint.enableCollision = false;
-            joint.enablePreprocessing = true;
-
-            joint.lowTwistLimit = new SoftJointLimit { limit = -twist };
-            joint.highTwistLimit = new SoftJointLimit { limit = twist };
-            joint.swing1Limit = new SoftJointLimit { limit = swing };
-            joint.swing2Limit = new SoftJointLimit { limit = swing };
         }
 
         private static void CreateMatchManager()
