@@ -1,3 +1,4 @@
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using PolyStrike.Match;
@@ -20,6 +21,8 @@ namespace PolyStrike.Gameplay
         private static AudioClip flashClip;
         private static AudioClip smokeClip;
         private static AudioClip igniteClip;
+
+        public static event Action<Vector3> FlashDetonated;
 
         private void Awake()
         {
@@ -106,6 +109,7 @@ namespace PolyStrike.Gameplay
         {
             PlayWorldClip(GetFlashClip(), position, 0.95f, 42f);
             StartCoroutine(ExplosionFlash(position, Color.white, 8.5f, 0.055f));
+            FlashDetonated?.Invoke(position);
 
             var players = Object.FindObjectsByType<FlashEffect>(FindObjectsSortMode.None);
             for (var i = 0; i < players.Length; i++)
