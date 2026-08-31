@@ -7,10 +7,13 @@ namespace PolyStrike.Core
 {
     public static class GameInput
     {
+        private static bool Blocked => DeveloperConsole.IsOpen;
+
         public static Vector2 Movement
         {
             get
             {
+                if (Blocked) return Vector2.zero;
 #if ENABLE_INPUT_SYSTEM
                 var keyboard = Keyboard.current;
                 if (keyboard == null)
@@ -33,6 +36,7 @@ namespace PolyStrike.Core
         {
             get
             {
+                if (Blocked) return Vector2.zero;
 #if ENABLE_INPUT_SYSTEM
                 return Mouse.current?.delta.ReadValue() ?? Vector2.zero;
 #else
@@ -45,6 +49,7 @@ namespace PolyStrike.Core
         {
             get
             {
+                if (Blocked) return false;
 #if ENABLE_INPUT_SYSTEM
                 return Keyboard.current?.spaceKey.wasPressedThisFrame == true;
 #else
@@ -57,6 +62,7 @@ namespace PolyStrike.Core
         {
             get
             {
+                if (Blocked) return false;
 #if ENABLE_INPUT_SYSTEM
                 var keyboard = Keyboard.current;
                 return keyboard != null && (keyboard.leftCtrlKey.isPressed || keyboard.cKey.isPressed);
@@ -70,6 +76,7 @@ namespace PolyStrike.Core
         {
             get
             {
+                if (Blocked) return false;
 #if ENABLE_INPUT_SYSTEM
                 return Keyboard.current?.leftShiftKey.isPressed == true;
 #else
@@ -82,6 +89,7 @@ namespace PolyStrike.Core
         {
             get
             {
+                if (Blocked) return false;
 #if ENABLE_INPUT_SYSTEM
                 return Keyboard.current?.kKey.isPressed == true;
 #else
@@ -94,6 +102,7 @@ namespace PolyStrike.Core
         {
             get
             {
+                if (Blocked) return false;
 #if ENABLE_INPUT_SYSTEM
                 return Mouse.current?.leftButton.isPressed == true;
 #else
@@ -106,6 +115,7 @@ namespace PolyStrike.Core
         {
             get
             {
+                if (Blocked) return false;
 #if ENABLE_INPUT_SYSTEM
                 return Mouse.current?.leftButton.wasPressedThisFrame == true;
 #else
@@ -118,6 +128,7 @@ namespace PolyStrike.Core
         {
             get
             {
+                if (Blocked) return false;
 #if ENABLE_INPUT_SYSTEM
                 return Mouse.current?.leftButton.wasReleasedThisFrame == true;
 #else
@@ -130,6 +141,7 @@ namespace PolyStrike.Core
         {
             get
             {
+                if (Blocked) return false;
 #if ENABLE_INPUT_SYSTEM
                 return Mouse.current?.rightButton.isPressed == true;
 #else
@@ -142,6 +154,7 @@ namespace PolyStrike.Core
         {
             get
             {
+                if (Blocked) return false;
 #if ENABLE_INPUT_SYSTEM
                 return Mouse.current?.rightButton.wasPressedThisFrame == true;
 #else
@@ -154,6 +167,7 @@ namespace PolyStrike.Core
         {
             get
             {
+                if (Blocked) return false;
 #if ENABLE_INPUT_SYSTEM
                 return Mouse.current?.rightButton.wasReleasedThisFrame == true;
 #else
@@ -166,6 +180,7 @@ namespace PolyStrike.Core
         {
             get
             {
+                if (Blocked) return false;
 #if ENABLE_INPUT_SYSTEM
                 return Keyboard.current?.eKey.isPressed == true;
 #else
@@ -178,6 +193,7 @@ namespace PolyStrike.Core
         {
             get
             {
+                if (Blocked) return false;
 #if ENABLE_INPUT_SYSTEM
                 return Keyboard.current?.bKey.wasPressedThisFrame == true;
 #else
@@ -190,6 +206,7 @@ namespace PolyStrike.Core
         {
             get
             {
+                if (Blocked) return false;
 #if ENABLE_INPUT_SYSTEM
                 return Keyboard.current?.gKey.wasPressedThisFrame == true;
 #else
@@ -202,6 +219,7 @@ namespace PolyStrike.Core
         {
             get
             {
+                if (Blocked) return false;
 #if ENABLE_INPUT_SYSTEM
                 return Keyboard.current?.rKey.wasPressedThisFrame == true;
 #else
@@ -214,6 +232,7 @@ namespace PolyStrike.Core
         {
             get
             {
+                if (Blocked) return false;
 #if ENABLE_INPUT_SYSTEM
                 return Keyboard.current?.digit1Key.wasPressedThisFrame == true;
 #else
@@ -226,6 +245,7 @@ namespace PolyStrike.Core
         {
             get
             {
+                if (Blocked) return false;
 #if ENABLE_INPUT_SYSTEM
                 return Keyboard.current?.digit2Key.wasPressedThisFrame == true;
 #else
@@ -238,6 +258,7 @@ namespace PolyStrike.Core
         {
             get
             {
+                if (Blocked) return false;
 #if ENABLE_INPUT_SYSTEM
                 return Keyboard.current?.digit4Key.wasPressedThisFrame == true;
 #else
@@ -250,6 +271,7 @@ namespace PolyStrike.Core
         {
             get
             {
+                if (Blocked) return false;
 #if ENABLE_INPUT_SYSTEM
                 return Keyboard.current?.digit5Key.wasPressedThisFrame == true;
 #else
@@ -262,6 +284,7 @@ namespace PolyStrike.Core
         {
             get
             {
+                if (Blocked) return false;
 #if ENABLE_INPUT_SYSTEM
                 return Keyboard.current?.digit6Key.wasPressedThisFrame == true;
 #else
@@ -274,6 +297,7 @@ namespace PolyStrike.Core
         {
             get
             {
+                if (Blocked) return false;
 #if ENABLE_INPUT_SYSTEM
                 return Keyboard.current?.digit7Key.wasPressedThisFrame == true;
 #else
@@ -286,6 +310,7 @@ namespace PolyStrike.Core
         {
             get
             {
+                if (Blocked) return false;
 #if ENABLE_INPUT_SYSTEM
                 return Keyboard.current?.digit8Key.wasPressedThisFrame == true;
 #else
@@ -298,6 +323,7 @@ namespace PolyStrike.Core
         {
             get
             {
+                if (Blocked) return false;
 #if ENABLE_INPUT_SYSTEM
                 return Keyboard.current?.digit0Key.wasPressedThisFrame == true;
 #else
@@ -310,6 +336,7 @@ namespace PolyStrike.Core
         {
             get
             {
+                if (Blocked) return false;
 #if ENABLE_INPUT_SYSTEM
                 return Keyboard.current?.tabKey.isPressed == true;
 #else
@@ -322,6 +349,7 @@ namespace PolyStrike.Core
         {
             get
             {
+                if (Blocked) return false;
 #if ENABLE_INPUT_SYSTEM
                 return Keyboard.current?.escapeKey.wasPressedThisFrame == true;
 #else
