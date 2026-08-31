@@ -151,6 +151,11 @@ console.not_bound=Bu tuşa komut atanmamış.
 console.exec_missing=CFG bulunamadı: {0}
 console.exec_done=CFG çalıştırıldı: {0}
 
+start.subtitle=Low-poly rekabetçi 5v5 alpha
+start.offline=BOTLARLA 5v5 OYNA
+start.online=ONLINE OYNA
+start.console_hint=~ tuşu ile geliştirici konsolunu açabilirsin.
+
 menu.play=Oyna
 menu.settings=Ayarlar
 menu.exit=Çıkış
