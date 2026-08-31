@@ -33,6 +33,8 @@ scoreboard.player=Oyuncu {0}
 scoreboard.you={0} (Sen)
 scoreboard.alive=Hayatta
 scoreboard.dead=Ölü
+scoreboard.kills=Öldürme
+scoreboard.deaths=Ölüm
 scoreboard.status=Durum
 
 match.phase.freeze=Freeze Time
