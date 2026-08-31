@@ -1,3 +1,4 @@
+using Unity.Entities;
 using Unity.NetCode;
 using UnityEngine;
 using UnityEngine.Scripting;
@@ -22,7 +23,26 @@ namespace PolyStrike.Networking
 #endif
 
             CreateDefaultClientServerWorlds();
+            ConfigureServerTickRate();
             return true;
+        }
+
+        private static void ConfigureServerTickRate()
+        {
+            foreach (var world in World.All)
+            {
+                if (!world.IsServer())
+                    continue;
+
+                var tickRate = new ClientServerTickRate
+                {
+                    SimulationTickRate = SimulationTickRate,
+                    NetworkTickRate = SimulationTickRate,
+                    MaxSimulationStepsPerFrame = 4
+                };
+                tickRate.ResolveDefaults();
+                world.EntityManager.CreateSingleton(tickRate);
+            }
         }
     }
 }
