@@ -15,18 +15,22 @@ namespace PolyStrike.Networking
         private readonly struct Entry
         {
             public readonly int NetworkId;
+            public readonly string PlayerName;
             public readonly byte Team;
             public readonly ushort Kills;
             public readonly ushort Deaths;
+            public readonly ushort PingMs;
             public readonly bool Alive;
             public readonly bool Local;
 
-            public Entry(int networkId, byte team, ushort kills, ushort deaths, bool alive, bool local)
+            public Entry(int networkId, string playerName, byte team, ushort kills, ushort deaths, ushort pingMs, bool alive, bool local)
             {
                 NetworkId = networkId;
+                PlayerName = playerName;
                 Team = team;
                 Kills = kills;
                 Deaths = deaths;
+                PingMs = pingMs;
                 Alive = alive;
                 Local = local;
             }
@@ -65,9 +69,11 @@ namespace PolyStrike.Networking
                 var isLocal = entityManager.HasComponent<GhostOwnerIsLocal>(entity);
                 entries.Add(new Entry(
                     owner.NetworkId,
+                    player.PlayerName.ToString(),
                     player.Team,
                     player.Kills,
                     player.Deaths,
+                    player.PingMs,
                     (player.Flags & NetworkPlayerFlags.Alive) != 0,
                     isLocal));
 
@@ -95,11 +101,11 @@ namespace PolyStrike.Networking
                 return deathCompare != 0 ? deathCompare : left.NetworkId.CompareTo(right.NetworkId);
             });
 
-            const float width = 660f;
-            const float height = 430f;
+            const float width = 760f;
+            const float height = 450f;
             var rect = new Rect(
                 (Screen.width - width) * 0.5f,
-                Mathf.Max(36f, (Screen.height - height) * 0.32f),
+                Mathf.Max(30f, (Screen.height - height) * 0.32f),
                 width,
                 height);
 
@@ -147,9 +153,10 @@ namespace PolyStrike.Networking
             GUILayout.BeginHorizontal();
             GUILayout.Label(team == 0 ? Localization.Get("team.t") : Localization.Get("team.ct"), headerStyle);
             GUILayout.FlexibleSpace();
-            GUILayout.Label(Localization.Get("scoreboard.kills"), centeredHeader, GUILayout.Width(72f));
-            GUILayout.Label(Localization.Get("scoreboard.deaths"), centeredHeader, GUILayout.Width(72f));
-            GUILayout.Label(Localization.Get("scoreboard.status"), headerStyle, GUILayout.Width(110f));
+            GUILayout.Label(Localization.Get("scoreboard.kills"), centeredHeader, GUILayout.Width(64f));
+            GUILayout.Label(Localization.Get("scoreboard.deaths"), centeredHeader, GUILayout.Width(64f));
+            GUILayout.Label(Localization.Get("scoreboard.ping"), centeredHeader, GUILayout.Width(70f));
+            GUILayout.Label(Localization.Get("scoreboard.status"), headerStyle, GUILayout.Width(105f));
             GUILayout.EndHorizontal();
 
             var rowStyle = new GUIStyle(GUI.skin.label)
@@ -174,7 +181,9 @@ namespace PolyStrike.Networking
                 if (entry.Team != team)
                     continue;
 
-                var playerName = Localization.Get("scoreboard.player").Replace("{0}", entry.NetworkId.ToString());
+                var playerName = string.IsNullOrWhiteSpace(entry.PlayerName)
+                    ? Localization.Get("scoreboard.player").Replace("{0}", entry.NetworkId.ToString())
+                    : entry.PlayerName;
                 if (entry.Local)
                     playerName = Localization.Get("scoreboard.you").Replace("{0}", playerName);
 
@@ -183,12 +192,13 @@ namespace PolyStrike.Networking
                 if (!entry.Alive)
                     GUI.color = new Color(previousColor.r, previousColor.g, previousColor.b, 0.55f);
 
-                GUILayout.BeginHorizontal(GUI.skin.box, GUILayout.Height(28f));
+                GUILayout.BeginHorizontal(GUI.skin.box, GUILayout.Height(30f));
                 GUILayout.Label(playerName, rowStyle);
                 GUILayout.FlexibleSpace();
-                GUILayout.Label(entry.Kills.ToString(), numberStyle, GUILayout.Width(72f));
-                GUILayout.Label(entry.Deaths.ToString(), numberStyle, GUILayout.Width(72f));
-                GUILayout.Label(status, statusStyle, GUILayout.Width(110f));
+                GUILayout.Label(entry.Kills.ToString(), numberStyle, GUILayout.Width(64f));
+                GUILayout.Label(entry.Deaths.ToString(), numberStyle, GUILayout.Width(64f));
+                GUILayout.Label(entry.PingMs.ToString(), numberStyle, GUILayout.Width(70f));
+                GUILayout.Label(status, statusStyle, GUILayout.Width(105f));
                 GUILayout.EndHorizontal();
                 GUI.color = previousColor;
             }
