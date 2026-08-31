@@ -5,7 +5,7 @@ using Unity.NetCode;
 namespace PolyStrike.Networking
 {
     [WorldSystemFilter(WorldSystemFilterFlags.ClientSimulation)]
-    [UpdateInGroup(typeof(ClientSimulationSystemGroup))]
+    [UpdateInGroup(typeof(SimulationSystemGroup))]
     public partial struct ClientEnterGameSystem : ISystem
     {
         public void OnUpdate(ref SystemState state)
