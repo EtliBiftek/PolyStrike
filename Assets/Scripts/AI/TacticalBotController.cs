@@ -11,26 +11,32 @@ namespace PolyStrike.AI
     [RequireComponent(typeof(MatchParticipant), typeof(PlayerMovement), typeof(Health))]
     public sealed class TacticalBotController : MonoBehaviour
     {
-        private const float PathRefreshInterval = 0.18f;
-        private const float EnemyScanInterval = 0.08f;
+        private const float PathRefreshInterval = 0.16f;
+        private const float EnemyScanInterval = 0.07f;
         private const float MaximumEngagementDistance = 55f;
         private const float CounterStrafeThreshold = 24f;
-        private const float TurnSpeed = 720f;
+        private const float TurnSpeed = 760f;
 
         private MatchParticipant participant;
         private PlayerMovement movement;
         private HitscanWeapon weapon;
+        private UtilityController utility;
+        private TacticalTeamCoordinator coordinator;
         private readonly NavMeshPath path = new NavMeshPath();
 
         private int slot;
-        private bool attackA;
         private int observedRound = -1;
         private MatchTeam observedTeam;
+        private TacticalBotRole role;
+        private bool attackA;
         private MatchParticipant target;
+        private MatchParticipant previousTarget;
+        private float targetAcquiredAt;
         private float nextPathRefresh;
         private float nextEnemyScan;
         private float nextShotTime;
         private float nextAimJitter;
+        private float burstPauseUntil;
         private float plantStartedAt = -1f;
         private float defuseStartedAt = -1f;
         private Vector2 aimJitter;
@@ -40,7 +46,13 @@ namespace PolyStrike.AI
         private int magazineAmmo;
         private int reserveAmmo;
         private int sprayIndex;
+        private int burstShots;
         private float lastShotTime = -10f;
+
+        private bool usedSmoke;
+        private bool usedFlash;
+        private bool usedHe;
+        private bool usedFire;
 
         public void Configure(int teamSlot)
         {
@@ -56,11 +68,27 @@ namespace PolyStrike.AI
 
         private void Start()
         {
+            coordinator = TacticalTeamCoordinator.EnsureExists();
+            utility = GetComponent<UtilityController>();
+            if (utility == null)
+                utility = gameObject.AddComponent<UtilityController>();
+
+            utility.SetReferences(null, movement, weapon, null);
+            utility.SetExternalInputBlocked(true);
+            participant.SetLoadoutReferences(weapon, utility);
+            participant.Died += OnDied;
+
             movement.SetMovementCommand(Vector2.zero, false, false, false);
             weapon?.SetExternalInputBlocked(true);
             observedTeam = participant.Team;
-            ChooseAttackSide();
+            role = coordinator.GetRole(observedTeam, slot);
             RefreshCombatProfile(true);
+        }
+
+        private void OnDestroy()
+        {
+            if (participant != null)
+                participant.Died -= OnDied;
         }
 
         private void OnDisable()
@@ -72,6 +100,8 @@ namespace PolyStrike.AI
         private void Update()
         {
             var match = MatchRoundManager.Instance;
+            weapon?.SetExternalInputBlocked(true);
+
             if (match == null || !participant.IsAlive)
             {
                 StopMoving();
@@ -99,6 +129,7 @@ namespace PolyStrike.AI
             {
                 plantStartedAt = -1f;
                 defuseStartedAt = -1f;
+                coordinator.ReportEnemy(participant.Team, target.transform.position);
                 FightTarget(target);
                 return;
             }
@@ -108,6 +139,12 @@ namespace PolyStrike.AI
             if (TryHandleObjective(match))
                 return;
 
+            if (TryUseUtility(match))
+            {
+                StopMoving();
+                return;
+            }
+
             Navigate(match);
         }
 
@@ -116,7 +153,6 @@ namespace PolyStrike.AI
             if (participant.Team != observedTeam)
             {
                 observedTeam = participant.Team;
-                ChooseAttackSide();
                 observedRound = -1;
             }
 
@@ -124,11 +160,18 @@ namespace PolyStrike.AI
                 return;
 
             observedRound = match.RoundNumber;
+            role = coordinator.GetRole(participant.Team, slot);
+            attackA = coordinator.IsAttackingA(observedRound);
             target = null;
+            previousTarget = null;
+            burstShots = 0;
             sprayIndex = 0;
             plantStartedAt = -1f;
             defuseStartedAt = -1f;
-            ChooseAttackSide();
+            usedSmoke = false;
+            usedFlash = false;
+            usedHe = false;
+            usedFire = false;
             RefreshCombatProfile(true);
         }
 
@@ -147,6 +190,39 @@ namespace PolyStrike.AI
 
             if (participant.Team == MatchTeam.CounterTerrorists && !participant.HasDefuseKit)
                 participant.BuyDefuseKit();
+
+            switch (role)
+            {
+                case TacticalBotRole.Entry:
+                    BuyIfPossible(GrenadeType.Flashbang);
+                    BuyIfPossible(GrenadeType.HighExplosive);
+                    break;
+                case TacticalBotRole.Trader:
+                    BuyIfPossible(GrenadeType.Flashbang);
+                    BuyIfPossible(GrenadeType.HighExplosive);
+                    break;
+                case TacticalBotRole.Support:
+                    BuyIfPossible(GrenadeType.Smoke);
+                    BuyIfPossible(GrenadeType.Flashbang);
+                    BuyIfPossible(GrenadeType.Flashbang);
+                    BuyIfPossible(GrenadeType.HighExplosive);
+                    break;
+                case TacticalBotRole.Lurk:
+                    BuyIfPossible(GrenadeType.Smoke);
+                    BuyIfPossible(GrenadeType.HighExplosive);
+                    break;
+                case TacticalBotRole.Anchor:
+                    BuyIfPossible(GrenadeType.Smoke);
+                    BuyIfPossible(GrenadeType.Molotov);
+                    BuyIfPossible(GrenadeType.Flashbang);
+                    break;
+            }
+        }
+
+        private void BuyIfPossible(GrenadeType type)
+        {
+            if (utility != null && utility.CanBuy(type))
+                participant.BuyGrenade(type);
         }
 
         private bool TryHandleObjective(MatchRoundManager match)
@@ -165,7 +241,6 @@ namespace PolyStrike.AI
                         C4Controller.TryBotPlant(participant);
                         plantStartedAt = -1f;
                     }
-
                     return true;
                 }
             }
@@ -179,10 +254,7 @@ namespace PolyStrike.AI
             }
 
             var bomb = C4Controller.PlantedBombTransform;
-            if (bomb == null)
-                return false;
-
-            if (Vector3.Distance(transform.position, bomb.position) > 1.7f)
+            if (bomb == null || Vector3.Distance(transform.position, bomb.position) > 1.7f)
                 return false;
 
             StopMoving();
@@ -195,8 +267,103 @@ namespace PolyStrike.AI
                 C4Controller.TryBotDefuse(participant);
                 defuseStartedAt = -1f;
             }
-
             return true;
+        }
+
+        private bool TryUseUtility(MatchRoundManager match)
+        {
+            if (utility == null)
+                return false;
+
+            if (coordinator.TryGetSharedEnemy(participant.Team, out var sharedEnemy, 2.4f) &&
+                !usedHe && utility.GetCount(GrenadeType.HighExplosive) > 0 &&
+                Vector3.Distance(transform.position, sharedEnemy) is > 6f and < 22f)
+            {
+                if (utility.TryBotThrowAt(GrenadeType.HighExplosive, sharedEnemy + Vector3.up * 0.25f))
+                {
+                    usedHe = true;
+                    return true;
+                }
+            }
+
+            if (participant.Team == MatchTeam.Terrorists && match.Phase == RoundPhase.Live)
+                return TryUseAttackUtility();
+
+            if (participant.Team == MatchTeam.CounterTerrorists && match.Phase == RoundPhase.PostPlant)
+                return TryUseRetakeUtility();
+
+            if (participant.Team == MatchTeam.CounterTerrorists && match.Phase == RoundPhase.Live &&
+                coordinator.TryGetSharedEnemy(participant.Team, out var pressure, 1.8f) &&
+                Vector3.Distance(transform.position, pressure) < 15f &&
+                !usedFire && utility.GetCount(GrenadeType.Molotov) > 0)
+            {
+                if (utility.TryBotThrowAt(GrenadeType.Molotov, pressure))
+                {
+                    usedFire = true;
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private bool TryUseAttackUtility()
+        {
+            var stage = coordinator.GetAttackStagingPoint(role, slot, observedRound);
+            if (Vector3.Distance(transform.position, stage) > 4.5f)
+                return false;
+
+            var site = attackA ? SandlineMap.ASiteCenter : SandlineMap.BSiteCenter;
+            var smokeTarget = attackA
+                ? SandlineMap.AShortEntry + new Vector3(2.2f, 0.2f, 2.4f)
+                : SandlineMap.BMidEntry + new Vector3(-1.8f, 0.2f, 2.5f);
+
+            if (!usedSmoke &&
+                (role == TacticalBotRole.Support || role == TacticalBotRole.Lurk || role == TacticalBotRole.Anchor) &&
+                utility.GetCount(GrenadeType.Smoke) > 0 &&
+                utility.TryBotThrowAt(GrenadeType.Smoke, smokeTarget))
+            {
+                usedSmoke = true;
+                return true;
+            }
+
+            if (!usedFlash &&
+                (role == TacticalBotRole.Entry || role == TacticalBotRole.Trader || role == TacticalBotRole.Support) &&
+                utility.GetCount(GrenadeType.Flashbang) > 0 &&
+                utility.TryBotThrowAt(GrenadeType.Flashbang, site + Vector3.up * 1.7f))
+            {
+                usedFlash = true;
+                return true;
+            }
+
+            return false;
+        }
+
+        private bool TryUseRetakeUtility()
+        {
+            var bomb = C4Controller.PlantedBombTransform;
+            if (bomb == null)
+                return false;
+
+            var distance = Vector3.Distance(transform.position, bomb.position);
+            if (distance is < 7f or > 20f)
+                return false;
+
+            if (!usedFlash && utility.GetCount(GrenadeType.Flashbang) > 0 &&
+                utility.TryBotThrowAt(GrenadeType.Flashbang, bomb.position + Vector3.up * 1.7f))
+            {
+                usedFlash = true;
+                return true;
+            }
+
+            if (!usedSmoke && utility.GetCount(GrenadeType.Smoke) > 0 &&
+                utility.TryBotThrowAt(GrenadeType.Smoke, bomb.position + Vector3.up * 0.15f))
+            {
+                usedSmoke = true;
+                return true;
+            }
+
+            return false;
         }
 
         private void Navigate(MatchRoundManager match)
@@ -216,7 +383,6 @@ namespace PolyStrike.AI
                 {
                     if (Vector3.Distance(transform.position, path.corners[i]) < 0.65f)
                         continue;
-
                     steeringTarget = path.corners[i];
                     break;
                 }
@@ -227,42 +393,100 @@ namespace PolyStrike.AI
             if (worldDirection.sqrMagnitude < 0.12f)
             {
                 StopMoving();
+                HoldAngle(match);
                 return;
             }
 
             worldDirection.Normalize();
             RotateTowards(worldDirection);
             var local = new Vector2(Vector3.Dot(transform.right, worldDirection), Vector3.Dot(transform.forward, worldDirection));
-            var walk = ShouldWalk(match, steeringTarget);
-            movement.SetMovementCommand(local, walk, false, false);
+            movement.SetMovementCommand(local, ShouldWalk(match, steeringTarget), false, false);
         }
 
         private Vector3 ResolveDestination(MatchRoundManager match)
         {
-            if (match.Phase == RoundPhase.PostPlant && participant.Team == MatchTeam.CounterTerrorists)
+            if (match.Phase == RoundPhase.PostPlant)
             {
                 var bomb = C4Controller.PlantedBombTransform;
                 if (bomb != null)
-                    return bomb.position;
+                {
+                    if (participant.Team == MatchTeam.CounterTerrorists)
+                        return ResolveRetakeDestination(bomb.position, match);
+
+                    var siteA = Vector3.Distance(bomb.position, SandlineMap.ASiteCenter) <
+                                Vector3.Distance(bomb.position, SandlineMap.BSiteCenter);
+                    return SandlineMap.GetPostPlantGoal(siteA, slot);
+                }
             }
 
             if (participant.Team == MatchTeam.CounterTerrorists)
-                return SandlineMap.GetDefendGoal(slot);
+            {
+                if (coordinator.TryGetTradePosition(participant.Team, out var trade, 1.8f) &&
+                    Vector3.Distance(transform.position, trade) < 15f)
+                    return trade;
+
+                if (coordinator.ShouldRotateCounterTerrorist(slot, transform.position) &&
+                    coordinator.TryGetSharedEnemy(participant.Team, out var enemyPosition, 3.0f))
+                    return enemyPosition;
+
+                return coordinator.GetDefendAnchor(slot);
+            }
+
+            if (coordinator.TryGetTradePosition(participant.Team, out var teammateDeath, 1.8f) &&
+                role != TacticalBotRole.Lurk && Vector3.Distance(transform.position, teammateDeath) < 14f)
+                return teammateDeath;
 
             var siteCenter = attackA ? SandlineMap.ASiteCenter : SandlineMap.BSiteCenter;
-            var control = SandlineMap.GetAttackGoal(attackA, slot);
-            return Vector3.Distance(transform.position, control) > 2.1f ? control : siteCenter;
+            var staging = coordinator.GetAttackStagingPoint(role, slot, observedRound);
+
+            if (role == TacticalBotRole.Lurk && match.TimeRemaining > 65f &&
+                !coordinator.TryGetSharedEnemy(participant.Team, out _, 2.0f))
+                return staging;
+
+            return Vector3.Distance(transform.position, staging) > 2.0f ? staging : siteCenter;
+        }
+
+        private Vector3 ResolveRetakeDestination(Vector3 bombPosition, MatchRoundManager match)
+        {
+            var distance = Vector3.Distance(transform.position, bombPosition);
+            if (distance < 6.5f || match.TimeRemaining < 12f)
+                return bombPosition;
+
+            var fromBomb = transform.position - bombPosition;
+            fromBomb.y = 0f;
+            if (fromBomb.sqrMagnitude < 0.01f)
+                fromBomb = Vector3.back;
+            fromBomb.Normalize();
+
+            var side = slot % 2 == 0 ? transform.right : -transform.right;
+            return bombPosition + fromBomb * 5.2f + side * 1.4f;
         }
 
         private bool ShouldWalk(MatchRoundManager match, Vector3 steeringTarget)
         {
             if (match.Phase == RoundPhase.PostPlant)
-                return false;
+                return participant.Team == MatchTeam.Terrorists && Vector3.Distance(transform.position, steeringTarget) < 5f;
 
-            if (participant.Team == MatchTeam.CounterTerrorists)
-                return Vector3.Distance(transform.position, steeringTarget) < 5f;
+            if (coordinator.TryGetSharedEnemy(participant.Team, out var enemyPosition, 2.4f) &&
+                Vector3.Distance(transform.position, enemyPosition) < 13f)
+                return true;
 
-            return Vector3.Distance(transform.position, steeringTarget) < 4f;
+            return Vector3.Distance(transform.position, steeringTarget) < 4.5f;
+        }
+
+        private void HoldAngle(MatchRoundManager match)
+        {
+            Vector3 lookAt;
+            if (participant.Team == MatchTeam.CounterTerrorists && coordinator.TryGetSharedEnemy(participant.Team, out var threat, 3f))
+                lookAt = threat;
+            else if (participant.Team == MatchTeam.Terrorists)
+                lookAt = attackA ? SandlineMap.ASiteCenter : SandlineMap.BSiteCenter;
+            else
+                lookAt = SandlineMap.MidControl;
+
+            var direction = lookAt - transform.position;
+            if (direction.sqrMagnitude > 0.1f)
+                RotateTowards(direction.normalized);
         }
 
         private void RefreshTarget()
@@ -272,6 +496,13 @@ namespace PolyStrike.AI
 
             nextEnemyScan = Time.time + EnemyScanInterval;
             target = FindBestVisibleEnemy();
+            if (target == previousTarget)
+                return;
+
+            previousTarget = target;
+            targetAcquiredAt = Time.time;
+            burstShots = 0;
+            sprayIndex = 0;
         }
 
         private MatchParticipant FindBestVisibleEnemy()
@@ -293,6 +524,8 @@ namespace PolyStrike.AI
                 var score = distance;
                 if (candidate.CarriesBomb)
                     score -= 4f;
+                if (coordinator.TryGetSharedEnemy(participant.Team, out var shared, 1.2f))
+                    score -= Mathf.Max(0f, 2.5f - Vector3.Distance(shared, candidate.transform.position));
 
                 if (score < bestScore)
                 {
@@ -332,6 +565,7 @@ namespace PolyStrike.AI
                 return;
 
             RotateTowards(aimDirection.normalized);
+            coordinator.ReportEnemy(participant.Team, enemy.transform.position);
 
             if (movement.SpeedSourceUnits > CounterStrafeThreshold)
             {
@@ -340,7 +574,10 @@ namespace PolyStrike.AI
             }
 
             movement.SetMovementCommand(Vector2.zero, false, false, false);
-            TryFire(aimDirection.normalized);
+            if (Time.time - targetAcquiredAt < ReactionTime)
+                return;
+
+            TryFire(aimDirection.normalized, Vector3.Distance(transform.position, enemy.transform.position));
         }
 
         private void CounterStrafe()
@@ -358,9 +595,9 @@ namespace PolyStrike.AI
             movement.SetMovementCommand(local, false, false, false);
         }
 
-        private void TryFire(Vector3 baseDirection)
+        private void TryFire(Vector3 baseDirection, float distance)
         {
-            if (combatProfile == null || Time.time < nextShotTime)
+            if (combatProfile == null || Time.time < nextShotTime || Time.time < burstPauseUntil)
                 return;
 
             if (magazineAmmo <= 0)
@@ -370,11 +607,15 @@ namespace PolyStrike.AI
                 reserveAmmo -= loaded;
                 nextShotTime = Time.time + combatProfile.ReloadFireReadyTime;
                 sprayIndex = 0;
+                burstShots = 0;
                 return;
             }
 
             if (Time.time - lastShotTime > 0.38f)
+            {
                 sprayIndex = 0;
+                burstShots = 0;
+            }
 
             var secondsPerShot = 60f / combatProfile.RoundsPerMinute;
             nextShotTime = Time.time + secondsPerShot;
@@ -384,7 +625,8 @@ namespace PolyStrike.AI
             if (Time.time >= nextAimJitter)
             {
                 nextAimJitter = Time.time + Random.Range(0.09f, 0.16f);
-                aimJitter = Random.insideUnitCircle * (usingPrimaryProfile ? 0.22f : 0.34f);
+                var roleScale = role == TacticalBotRole.Entry ? 1.08f : role == TacticalBotRole.Anchor ? 0.90f : 1f;
+                aimJitter = Random.insideUnitCircle * (usingPrimaryProfile ? 0.22f : 0.34f) * roleScale;
             }
 
             var patternIndex = Mathf.Clamp(sprayIndex, 0, combatProfile.SprayPattern.Length - 1);
@@ -396,6 +638,15 @@ namespace PolyStrike.AI
             var aimRotation = Quaternion.LookRotation(baseDirection, Vector3.up) * Quaternion.Euler(-error.y, error.x, 0f);
             FireRay(aimRotation * Vector3.forward);
             sprayIndex++;
+            burstShots++;
+
+            var burstLimit = !usingPrimaryProfile ? 1 : distance > 18f ? 4 : distance > 9f ? 7 : 10;
+            if (burstShots >= burstLimit)
+            {
+                burstShots = 0;
+                sprayIndex = 0;
+                burstPauseUntil = Time.time + Random.Range(0.08f, distance > 18f ? 0.18f : 0.13f);
+            }
         }
 
         private void FireRay(Vector3 direction)
@@ -460,6 +711,7 @@ namespace PolyStrike.AI
             magazineAmmo = combatProfile.MagazineSize;
             reserveAmmo = combatProfile.ReserveAmmo;
             sprayIndex = 0;
+            burstShots = 0;
             movement.SetExternalMaxSpeed(combatProfile.MaxMoveSpeedSourceUnits);
         }
 
@@ -478,10 +730,19 @@ namespace PolyStrike.AI
             movement.SetMovementCommand(Vector2.zero, false, false, false);
         }
 
-        private void ChooseAttackSide()
+        private void OnDied(MatchParticipant dead)
         {
-            attackA = ((slot + Random.Range(0, 3)) & 1) == 0;
+            coordinator?.ReportTeammateDeath(dead.Team, dead.transform.position);
         }
+
+        private float ReactionTime => role switch
+        {
+            TacticalBotRole.Entry => 0.19f,
+            TacticalBotRole.Trader => 0.17f,
+            TacticalBotRole.Support => 0.21f,
+            TacticalBotRole.Lurk => 0.18f,
+            _ => 0.20f
+        };
 
         private Vector3 EyePosition => transform.position + Vector3.up * 1.58f;
     }
