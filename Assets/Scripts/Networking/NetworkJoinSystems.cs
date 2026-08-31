@@ -46,6 +46,13 @@ namespace PolyStrike.Networking
                     counterTerroristCount++;
             }
 
+            var joinAlive = true;
+            if (SystemAPI.TryGetSingleton<NetworkMatchRuntime>(out var matchRuntime) && matchRuntime.Started != 0)
+            {
+                joinAlive = matchRuntime.Phase == NetworkMatchPhase.FreezeTime ||
+                            matchRuntime.Phase == NetworkMatchPhase.Waiting;
+            }
+
             var commandBuffer = new EntityCommandBuffer(Allocator.Temp);
             foreach (var (request, _, rpcEntity) in SystemAPI.Query<RefRO<ReceiveRpcCommandRequest>, RefRO<NetworkJoinRequest>>().WithEntityAccess())
             {
@@ -92,19 +99,25 @@ namespace PolyStrike.Networking
                     Pitch = 0f,
                     CrouchAmount = 0f,
                     VelocityModifier = 1f,
-                    Health = 100,
+                    Health = joinAlive ? (ushort)100 : (ushort)0,
                     Armor = 0,
                     Money = NetworkMatchRules.StartMoney,
                     Team = team,
                     ActiveWeapon = 2,
                     MagazineAmmo = pistolMagazine,
                     ReserveAmmo = pistolReserve,
-                    Flags = NetworkPlayerFlags.Alive | NetworkPlayerFlags.Grounded
+                    Flags = joinAlive
+                        ? NetworkPlayerFlags.Alive | NetworkPlayerFlags.Grounded
+                        : NetworkPlayerFlags.Grounded
                 });
                 commandBuffer.SetComponent(player, new NetworkLoadoutState
                 {
                     PistolMagazine = pistolMagazine,
                     PistolReserve = pistolReserve
+                });
+                commandBuffer.SetComponent(player, new NetworkBombDropRuntime
+                {
+                    WasAlive = joinAlive ? (byte)1 : (byte)0
                 });
 
                 commandBuffer.AppendToBuffer(connection, new LinkedEntityGroup { Value = player });
