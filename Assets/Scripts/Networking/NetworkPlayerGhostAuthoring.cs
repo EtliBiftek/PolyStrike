@@ -40,11 +40,15 @@ namespace PolyStrike.Networking
                 var entity = GetEntity(TransformUsageFlags.Dynamic);
                 AddComponent(entity, new NetworkPlayerState
                 {
+                    VelocityModifier = 1f,
                     Health = 100,
                     Armor = 0,
+                    Money = 800,
                     Flags = NetworkPlayerFlags.Alive | NetworkPlayerFlags.Grounded
                 });
                 AddComponent<NetworkPlayerInput>(entity);
+                AddComponent<NetworkWeaponRuntime>(entity);
+                AddComponent<NetworkTagState>(entity);
                 AddBuffer<NetworkPlayerPoseHistory>(entity);
             }
         }
