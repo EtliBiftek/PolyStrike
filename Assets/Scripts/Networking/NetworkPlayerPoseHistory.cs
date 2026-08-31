@@ -14,7 +14,7 @@ namespace PolyStrike.Networking
     }
 
     [WorldSystemFilter(WorldSystemFilterFlags.ServerSimulation)]
-    [UpdateInGroup(typeof(ServerSimulationSystemGroup), OrderLast = true)]
+    [UpdateInGroup(typeof(SimulationSystemGroup), OrderLast = true)]
     public partial struct ServerPlayerPoseHistorySystem : ISystem
     {
         // CS2 currently caps server-side unlag at 0.200 seconds. At 64 Hz that is 12.8 ticks;
