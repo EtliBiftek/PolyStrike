@@ -29,7 +29,7 @@ namespace PolyStrike.Networking
     }
 
     [WorldSystemFilter(WorldSystemFilterFlags.ServerSimulation)]
-    [UpdateInGroup(typeof(ServerSimulationSystemGroup))]
+    [UpdateInGroup(typeof(SimulationSystemGroup))]
     public partial struct ServerNetworkPlayerSpawnSystem : ISystem
     {
         public void OnCreate(ref SystemState state)
