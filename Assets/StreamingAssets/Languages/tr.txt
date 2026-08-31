@@ -2,7 +2,7 @@
 # Yeni bir dil eklemek için bu dosyayı kopyalayıp örneğin en.txt olarak çevirmen yeterli.
 
 prototype.title=PolyStrike - CS2 Hissi Prototipi
-prototype.controls=WASD: Hareket | Shift: Yürü | Space: Zıpla | Ctrl/C: Çömel | K: Takım Sesi | Tab: Skor Tablosu | 1: Primary | 2: Tabanca | 4: Utility | 5: C4 | 6: HE | 7: Flash | 8: Smoke | 0: Ateş Bombası | Mouse1/E: Plant | E: Defuse | G: Eşyayı Bırak | B: Satın Al | R: Şarjör Değiştir
+prototype.controls=WASD: Hareket | Shift: Yürü | Space: Zıpla | Ctrl/C: Çömel | K: Takım Sesi | Tab: Skor Tablosu | ~: Konsol | 1: Primary | 2: Tabanca | 4: Utility | 5: C4 | 6: HE | 7: Flash | 8: Smoke | 0: Ateş Bombası | Mouse1/E: Plant | E: Defuse | G: Eşyayı Bırak | B: Satın Al | R: Şarjör Değiştir
 
 team.t=T
 team.ct=CT
@@ -127,6 +127,29 @@ network.round_winner={0} roundu kazandı
 network.local_team=Takım: {0}
 network.player_count=Oyuncu: {0}/10
 network.phase_time={0} | {1}s
+
+console.title=POLYSTRIKE GELİŞTİRİCİ KONSOLU
+console.ready=Konsol hazır. Komutları görmek için help yaz.
+console.hint=Enter: Çalıştır | Yukarı/Aşağı: Geçmiş | Tab: Tamamla | ~ veya Esc: Kapat
+console.unknown=Bilinmeyen komut: {0}
+console.error=Komut hatası: {0}
+console.usage=Kullanım: {0}
+console.command_list=Kullanılabilir komutlar:
+console.cheats_required=Bu komut için sv_cheats 1 gerekli.
+console.restart=Maç {0:0.##} saniye içinde yeniden başlatılacak.
+console.map_unknown=Harita bulunamadı: {0}
+console.ok=Tamam.
+console.no_bot=Yerleştirilecek bot yok.
+console.team_full=Bu takım dolu.
+console.offline_only=Bu practice komutu şu anda yerel bot maçında kullanılabilir.
+console.give_unknown=Bu eşya henüz desteklenmiyor: {0}
+console.connecting={0} adresine bağlanılıyor...
+console.disconnected=Bağlantı kesiliyor...
+console.status_players=Oyuncular: {0}
+console.bad_key=Geçersiz tuş: {0}
+console.not_bound=Bu tuşa komut atanmamış.
+console.exec_missing=CFG bulunamadı: {0}
+console.exec_done=CFG çalıştırıldı: {0}
 
 menu.play=Oyna
 menu.settings=Ayarlar
