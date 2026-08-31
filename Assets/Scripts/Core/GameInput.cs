@@ -78,6 +78,18 @@ namespace PolyStrike.Core
             }
         }
 
+        public static bool VoiceHeld
+        {
+            get
+            {
+#if ENABLE_INPUT_SYSTEM
+                return Keyboard.current?.kKey.isPressed == true;
+#else
+                return Input.GetKey(KeyCode.K);
+#endif
+            }
+        }
+
         public static bool FireHeld
         {
             get
