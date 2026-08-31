@@ -16,6 +16,8 @@ namespace PolyStrike.AI
         private const float MaximumEngagementDistance = 55f;
         private const float CounterStrafeThreshold = 24f;
         private const float TurnSpeed = 760f;
+        private const float FlashRadiusUnits = 1500f;
+        private const float FlashMaxDuration = 5.07f;
 
         private MatchParticipant participant;
         private PlayerMovement movement;
@@ -39,6 +41,10 @@ namespace PolyStrike.AI
         private float burstPauseUntil;
         private float plantStartedAt = -1f;
         private float defuseStartedAt = -1f;
+        private float flashedUntil = -1f;
+        private float flashSeverity;
+        private float nextBlindMoveAt;
+        private Vector2 blindMove;
         private Vector2 aimJitter;
         private Vector3 destination;
         private WeaponTuning combatProfile;
@@ -76,7 +82,7 @@ namespace PolyStrike.AI
             utility.SetReferences(null, movement, weapon, null);
             utility.SetExternalInputBlocked(true);
             participant.SetLoadoutReferences(weapon, utility);
-            participant.Died += OnDied;
+            GrenadeEffects.FlashDetonated += OnFlashDetonated;
 
             movement.SetMovementCommand(Vector2.zero, false, false, false);
             weapon?.SetExternalInputBlocked(true);
@@ -87,8 +93,7 @@ namespace PolyStrike.AI
 
         private void OnDestroy()
         {
-            if (participant != null)
-                participant.Died -= OnDied;
+            GrenadeEffects.FlashDetonated -= OnFlashDetonated;
         }
 
         private void OnDisable()
@@ -121,6 +126,12 @@ namespace PolyStrike.AI
             if (match.Phase == RoundPhase.RoundEnd || match.Phase == RoundPhase.HalfTime || match.Phase == RoundPhase.MatchEnd)
             {
                 StopMoving();
+                return;
+            }
+
+            if (Time.time < flashedUntil)
+            {
+                HandleFlashBlindness();
                 return;
             }
 
@@ -168,6 +179,8 @@ namespace PolyStrike.AI
             sprayIndex = 0;
             plantStartedAt = -1f;
             defuseStartedAt = -1f;
+            flashedUntil = -1f;
+            flashSeverity = 0f;
             usedSmoke = false;
             usedFlash = false;
             usedHe = false;
@@ -276,10 +289,11 @@ namespace PolyStrike.AI
                 return false;
 
             if (coordinator.TryGetSharedEnemy(participant.Team, out var sharedEnemy, 2.4f) &&
-                !usedHe && utility.GetCount(GrenadeType.HighExplosive) > 0 &&
-                Vector3.Distance(transform.position, sharedEnemy) is > 6f and < 22f)
+                !usedHe && utility.GetCount(GrenadeType.HighExplosive) > 0)
             {
-                if (utility.TryBotThrowAt(GrenadeType.HighExplosive, sharedEnemy + Vector3.up * 0.25f))
+                var enemyDistance = Vector3.Distance(transform.position, sharedEnemy);
+                if (enemyDistance > 6f && enemyDistance < 22f &&
+                    utility.TryBotThrowAt(GrenadeType.HighExplosive, sharedEnemy + Vector3.up * 0.25f))
                 {
                     usedHe = true;
                     return true;
@@ -346,7 +360,7 @@ namespace PolyStrike.AI
                 return false;
 
             var distance = Vector3.Distance(transform.position, bomb.position);
-            if (distance is < 7f or > 20f)
+            if (distance < 7f || distance > 20f)
                 return false;
 
             if (!usedFlash && utility.GetCount(GrenadeType.Flashbang) > 0 &&
@@ -544,6 +558,9 @@ namespace PolyStrike.AI
 
             var origin = EyePosition;
             var targetPoint = candidate.transform.position + Vector3.up * 1.25f;
+            if (SmokeCloud.BlocksLineOfSight(origin, targetPoint))
+                return false;
+
             var delta = targetPoint - origin;
             var distance = delta.magnitude;
             if (distance <= 0.01f)
@@ -677,6 +694,59 @@ namespace PolyStrike.AI
                 participant.AddMoney(combatProfile.KillReward);
         }
 
+        private void OnFlashDetonated(Vector3 position)
+        {
+            if (!participant.IsAlive)
+                return;
+
+            var eye = EyePosition;
+            var toEye = eye - position;
+            var distanceMeters = toEye.magnitude;
+            if (distanceMeters <= 0.01f)
+                return;
+
+            var distanceUnits = SourceUnit.ToSourceUnits(distanceMeters);
+            if (distanceUnits >= FlashRadiusUnits)
+                return;
+
+            var direction = toEye / distanceMeters;
+            if (Physics.Raycast(position + direction * 0.02f, direction, out var hit, distanceMeters, ~0, QueryTriggerInteraction.Ignore))
+            {
+                var hitHealth = hit.collider.GetComponentInParent<Health>();
+                if (hitHealth != participant.Health)
+                    return;
+            }
+
+            var toFlash = (position - eye).normalized;
+            var facing = Vector3.Dot(transform.forward, toFlash);
+            var angleFactor = Mathf.Lerp(0.12f, 1f, Mathf.InverseLerp(-0.35f, 0.92f, facing));
+            var distanceFactor = 1f - Mathf.Clamp01(distanceUnits / FlashRadiusUnits);
+            distanceFactor = Mathf.Sqrt(distanceFactor);
+            var intensity = Mathf.Clamp01(angleFactor * Mathf.Lerp(0.42f, 1f, distanceFactor));
+            var duration = FlashMaxDuration * distanceFactor * Mathf.Lerp(0.22f, 1f, angleFactor);
+            if (duration < 0.08f)
+                return;
+
+            flashSeverity = Mathf.Max(flashSeverity, intensity);
+            flashedUntil = Mathf.Max(flashedUntil, Time.time + duration);
+            target = null;
+            previousTarget = null;
+            nextBlindMoveAt = 0f;
+        }
+
+        private void HandleFlashBlindness()
+        {
+            target = null;
+            if (Time.time >= nextBlindMoveAt)
+            {
+                nextBlindMoveAt = Time.time + Random.Range(0.22f, 0.42f);
+                blindMove = new Vector2(Random.Range(-0.8f, 0.8f), Random.Range(-0.35f, 0.15f)) * Mathf.Lerp(0.35f, 1f, flashSeverity);
+            }
+
+            movement.SetMovementCommand(blindMove, false, false, false);
+            transform.Rotate(0f, Random.Range(-65f, 65f) * flashSeverity * Time.deltaTime, 0f);
+        }
+
         private float CalculateInaccuracy()
         {
             var crouched = movement.DuckAmount > 0.5f;
@@ -728,11 +798,6 @@ namespace PolyStrike.AI
         private void StopMoving()
         {
             movement.SetMovementCommand(Vector2.zero, false, false, false);
-        }
-
-        private void OnDied(MatchParticipant dead)
-        {
-            coordinator?.ReportTeammateDeath(dead.Team, dead.transform.position);
         }
 
         private float ReactionTime => role switch
