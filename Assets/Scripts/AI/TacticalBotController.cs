@@ -66,6 +66,7 @@ namespace PolyStrike.AI
         private void OnDisable()
         {
             movement?.ClearMovementCommand();
+            movement?.ClearExternalMaxSpeed();
         }
 
         private void Update()
@@ -339,7 +340,7 @@ namespace PolyStrike.AI
             }
 
             movement.SetMovementCommand(Vector2.zero, false, false, false);
-            TryFire(enemy, aimDirection.normalized);
+            TryFire(aimDirection.normalized);
         }
 
         private void CounterStrafe()
@@ -357,21 +358,23 @@ namespace PolyStrike.AI
             movement.SetMovementCommand(local, false, false, false);
         }
 
-        private void TryFire(MatchParticipant enemy, Vector3 baseDirection)
+        private void TryFire(Vector3 baseDirection)
         {
             if (combatProfile == null || Time.time < nextShotTime)
                 return;
 
             if (magazineAmmo <= 0)
             {
-                var needed = combatProfile.MagazineSize;
-                var loaded = Mathf.Min(needed, reserveAmmo);
+                var loaded = Mathf.Min(combatProfile.MagazineSize, reserveAmmo);
                 magazineAmmo = loaded;
                 reserveAmmo -= loaded;
                 nextShotTime = Time.time + combatProfile.ReloadFireReadyTime;
                 sprayIndex = 0;
                 return;
             }
+
+            if (Time.time - lastShotTime > 0.38f)
+                sprayIndex = 0;
 
             var secondsPerShot = 60f / combatProfile.RoundsPerMinute;
             nextShotTime = Time.time + secondsPerShot;
@@ -384,9 +387,6 @@ namespace PolyStrike.AI
                 aimJitter = Random.insideUnitCircle * (usingPrimaryProfile ? 0.22f : 0.34f);
             }
 
-            if (Time.time - lastShotTime > 0.38f)
-                sprayIndex = 0;
-
             var patternIndex = Mathf.Clamp(sprayIndex, 0, combatProfile.SprayPattern.Length - 1);
             var recoil = combatProfile.SprayPattern[patternIndex] * 0.22f;
             var inaccuracy = CalculateInaccuracy();
@@ -394,12 +394,11 @@ namespace PolyStrike.AI
             var error = aimJitter + recoil + randomSpread;
 
             var aimRotation = Quaternion.LookRotation(baseDirection, Vector3.up) * Quaternion.Euler(-error.y, error.x, 0f);
-            var shotDirection = aimRotation * Vector3.forward;
-            FireRay(enemy, shotDirection);
+            FireRay(aimRotation * Vector3.forward);
             sprayIndex++;
         }
 
-        private void FireRay(MatchParticipant expectedEnemy, Vector3 direction)
+        private void FireRay(Vector3 direction)
         {
             var origin = EyePosition + direction * 0.08f;
             if (!Physics.Raycast(origin, direction, out var hit, combatProfile.RangeMeters, ~0, QueryTriggerInteraction.Ignore))
@@ -461,6 +460,7 @@ namespace PolyStrike.AI
             magazineAmmo = combatProfile.MagazineSize;
             reserveAmmo = combatProfile.ReserveAmmo;
             sprayIndex = 0;
+            movement.SetExternalMaxSpeed(combatProfile.MaxMoveSpeedSourceUnits);
         }
 
         private void RotateTowards(Vector3 direction)
