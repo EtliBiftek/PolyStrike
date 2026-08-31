@@ -39,6 +39,7 @@ namespace PolyStrike.Networking
             root.AddComponent<NetworkKillFeedOverlay>();
             root.AddComponent<NetworkSpectatorController>();
             root.AddComponent<NetworkTeamVoiceChat>();
+            root.AddComponent<NetworkCompetitiveAudio>();
         }
 
         private void Awake()
