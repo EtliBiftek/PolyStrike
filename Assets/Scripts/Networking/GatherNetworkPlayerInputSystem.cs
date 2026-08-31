@@ -8,6 +8,11 @@ namespace PolyStrike.Networking
     [UpdateInGroup(typeof(GhostInputSystemGroup))]
     public partial class GatherNetworkPlayerInputSystem : SystemBase
     {
+        private const float LookSensitivity = 0.085f;
+
+        private float yaw;
+        private float pitch;
+
         protected override void OnCreate()
         {
             RequireForUpdate<NetworkPlayerInput>();
@@ -17,7 +22,10 @@ namespace PolyStrike.Networking
         protected override void OnUpdate()
         {
             var move = GameInput.Movement;
-            var look = GameInput.MouseDelta;
+            var lookDelta = GameInput.MouseDelta * LookSensitivity;
+            yaw = WrapAngle(yaw + lookDelta.x);
+            pitch = math.clamp(pitch - lookDelta.y, -89f, 89f);
+
             var jump = GameInput.JumpPressed;
             var firePressed = GameInput.FirePressed;
             var fireReleased = GameInput.FireReleased;
@@ -40,7 +48,7 @@ namespace PolyStrike.Networking
                 .ForEach((ref NetworkPlayerInput input) =>
                 {
                     input.Move = new float2(move.x, move.y);
-                    input.Look = new float2(look.x, look.y);
+                    input.Look = new float2(yaw, pitch);
                     input.CrouchHeld = crouch;
                     input.WalkHeld = walk;
                     input.FireHeld = fire;
@@ -84,6 +92,12 @@ namespace PolyStrike.Networking
         private static byte QuantizeSubtick(float fraction)
         {
             return (byte)math.clamp((int)math.round(math.saturate(fraction) * 255f), 0, 255);
+        }
+
+        private static float WrapAngle(float angle)
+        {
+            angle %= 360f;
+            return angle < 0f ? angle + 360f : angle;
         }
 
         private static byte ResolveWeaponSlot()
