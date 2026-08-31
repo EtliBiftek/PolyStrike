@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Threading.Tasks;
 using PolyStrike.Core;
 using Unity.Collections;
@@ -14,11 +15,14 @@ namespace PolyStrike.Networking
     [DisallowMultipleComponent]
     public sealed class NetworkTeamVoiceChat : MonoBehaviour
     {
+        private readonly Dictionary<string, VivoxParticipant> participants = new Dictionary<string, VivoxParticipant>();
+
         private bool operationInFlight;
         private bool serviceReady;
         private bool channelReady;
         private bool transmitting;
         private bool transmissionInFlight;
+        private bool participantEventsBound;
         private string currentChannel = string.Empty;
         private string statusKey = "voice.status.starting";
 
@@ -56,6 +60,7 @@ namespace PolyStrike.Networking
                 if (!serviceReady)
                 {
                     await VivoxService.Instance.InitializeAsync();
+                    BindParticipantEvents();
                     await VivoxService.Instance.LoginAsync(new LoginOptions
                     {
                         DisplayName = NetworkConnectionMenu.LocalPlayerName,
@@ -70,6 +75,7 @@ namespace PolyStrike.Networking
                 {
                     await VivoxService.Instance.SetChannelTransmissionModeAsync(TransmissionMode.None);
                     await VivoxService.Instance.LeaveChannelAsync(currentChannel);
+                    participants.Clear();
                     transmitting = false;
                 }
 
@@ -124,6 +130,30 @@ namespace PolyStrike.Networking
             }
         }
 
+        private void BindParticipantEvents()
+        {
+            if (participantEventsBound)
+                return;
+
+            VivoxService.Instance.ParticipantAddedToChannel += OnParticipantAdded;
+            VivoxService.Instance.ParticipantRemovedFromChannel += OnParticipantRemoved;
+            participantEventsBound = true;
+        }
+
+        private void OnParticipantAdded(VivoxParticipant participant)
+        {
+            if (participant == null)
+                return;
+            participants[participant.PlayerId] = participant;
+        }
+
+        private void OnParticipantRemoved(VivoxParticipant participant)
+        {
+            if (participant == null)
+                return;
+            participants.Remove(participant.PlayerId);
+        }
+
         private void OnGUI()
         {
             if (!TryGetLocalPlayer(out _))
@@ -137,15 +167,31 @@ namespace PolyStrike.Networking
             };
             style.normal.textColor = Color.white;
 
+            var y = Screen.height - 176f;
             if (transmitting)
             {
-                GUI.Box(new Rect(18f, Screen.height - 176f, 260f, 34f), string.Empty);
-                GUI.Label(new Rect(30f, Screen.height - 172f, 236f, 26f), Localization.Get("voice.transmitting"), style);
+                GUI.Box(new Rect(18f, y, 260f, 34f), string.Empty);
+                GUI.Label(new Rect(30f, y + 4f, 236f, 26f), Localization.Get("voice.transmitting"), style);
+                y -= 38f;
             }
             else if (GameInput.VoiceHeld && !channelReady)
             {
-                GUI.Box(new Rect(18f, Screen.height - 176f, 300f, 34f), string.Empty);
-                GUI.Label(new Rect(30f, Screen.height - 172f, 276f, 26f), Localization.Get(statusKey), style);
+                GUI.Box(new Rect(18f, y, 300f, 34f), string.Empty);
+                GUI.Label(new Rect(30f, y + 4f, 276f, 26f), Localization.Get(statusKey), style);
+                y -= 38f;
+            }
+
+            foreach (var pair in participants)
+            {
+                var participant = pair.Value;
+                if (participant == null || participant.IsSelf || !participant.SpeechDetected ||
+                    !string.Equals(participant.ChannelName, currentChannel, StringComparison.Ordinal))
+                    continue;
+
+                var text = Localization.Get("voice.speaking").Replace("{0}", participant.DisplayName);
+                GUI.Box(new Rect(18f, y, 260f, 32f), string.Empty);
+                GUI.Label(new Rect(30f, y + 3f, 236f, 26f), text, style);
+                y -= 35f;
             }
         }
 
@@ -185,6 +231,13 @@ namespace PolyStrike.Networking
         {
             try
             {
+                if (participantEventsBound)
+                {
+                    VivoxService.Instance.ParticipantAddedToChannel -= OnParticipantAdded;
+                    VivoxService.Instance.ParticipantRemovedFromChannel -= OnParticipantRemoved;
+                    participantEventsBound = false;
+                }
+
                 if (!serviceReady)
                     return;
 
