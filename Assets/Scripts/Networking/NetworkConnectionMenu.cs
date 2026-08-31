@@ -12,12 +12,17 @@ namespace PolyStrike.Networking
     public sealed class NetworkConnectionMenu : MonoBehaviour
     {
         private const float ConnectionEntityGracePeriod = 1.25f;
+        private const string PlayerNamePreference = "polystrike.player_name";
+        private const int MaximumPlayerNameLength = 24;
 
         private string address = "127.0.0.1";
+        private string playerName = string.Empty;
         private bool connectionRequested;
         private bool onlineScenePrepared;
         private float connectionRequestedAt;
         private string statusKey = "network.status.ready";
+
+        public static string LocalPlayerName { get; private set; } = string.Empty;
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void EnsureExists()
@@ -33,6 +38,15 @@ namespace PolyStrike.Networking
             root.AddComponent<NetworkBuyMenu>();
         }
 
+        private void Awake()
+        {
+            playerName = PlayerPrefs.GetString(PlayerNamePreference, string.Empty).Trim();
+            if (string.IsNullOrWhiteSpace(playerName))
+                playerName = Localization.Get("network.default_name");
+            LocalPlayerName = NormalizePlayerName(playerName);
+            playerName = LocalPlayerName;
+        }
+
         private void Update()
         {
             if (!connectionRequested || IsClientConnected())
@@ -41,7 +55,6 @@ namespace PolyStrike.Networking
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
 
-            // A connect request is consumed before the connection entity appears, so give NetCode one short grace window.
             if (HasClientConnectionEntity() || Time.unscaledTime - connectionRequestedAt < ConnectionEntityGracePeriod)
                 return;
 
@@ -58,7 +71,7 @@ namespace PolyStrike.Networking
             Cursor.visible = true;
 
             const float width = 420f;
-            const float height = 320f;
+            const float height = 370f;
             var rect = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
             GUI.Box(rect, string.Empty);
 
@@ -73,6 +86,10 @@ namespace PolyStrike.Networking
                     GUILayout.Label(Localization.Get(statusKey));
                     GUILayout.Space(8f);
                 }
+
+                GUILayout.Label(Localization.Get("network.player_name"));
+                playerName = GUILayout.TextField(playerName, MaximumPlayerNameLength);
+                GUILayout.Space(8f);
 
                 GUILayout.Label(Localization.Get("network.address"));
                 address = GUILayout.TextField(address, 64);
@@ -107,6 +124,7 @@ namespace PolyStrike.Networking
                 return;
             }
 
+            SavePlayerName();
             PrepareOnlineScene();
 
             var listenEndpoint = NetworkEndpoint.AnyIpv4.WithPort(PolyStrikeNetcodeBootstrap.DefaultGamePort);
@@ -149,10 +167,29 @@ namespace PolyStrike.Networking
                 return;
             }
 
+            SavePlayerName();
             PrepareOnlineScene();
             var connect = clientWorld.EntityManager.CreateEntity(typeof(NetworkStreamRequestConnect));
             clientWorld.EntityManager.SetComponentData(connect, new NetworkStreamRequestConnect { Endpoint = endpoint });
             BeginConnectionAttempt("network.status.connecting");
+        }
+
+        private void SavePlayerName()
+        {
+            LocalPlayerName = NormalizePlayerName(playerName);
+            playerName = LocalPlayerName;
+            PlayerPrefs.SetString(PlayerNamePreference, LocalPlayerName);
+            PlayerPrefs.Save();
+        }
+
+        private static string NormalizePlayerName(string value)
+        {
+            var normalized = value?.Trim() ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(normalized))
+                normalized = Localization.Get("network.default_name");
+            if (normalized.Length > MaximumPlayerNameLength)
+                normalized = normalized[..MaximumPlayerNameLength];
+            return normalized;
         }
 
         private void BeginConnectionAttempt(string nextStatusKey)
