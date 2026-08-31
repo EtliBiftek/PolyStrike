@@ -1,6 +1,7 @@
 using System.Collections.Generic;
 using PolyStrike.Maps;
 using PolyStrike.Match;
+using PolyStrike.Player;
 using UnityEngine;
 
 namespace PolyStrike.AI
@@ -25,6 +26,10 @@ namespace PolyStrike.AI
 
     public sealed class TacticalTeamCoordinator : MonoBehaviour
     {
+        private const float HearingScanInterval = 0.14f;
+        private const float RunningFootstepThreshold = 135f;
+        private const float HearingRange = 14f;
+
         private sealed class TeamState
         {
             public int RoundNumber = -1;
@@ -40,6 +45,7 @@ namespace PolyStrike.AI
         private readonly TeamState terrorists = new TeamState();
         private readonly TeamState counterTerrorists = new TeamState();
         private readonly HashSet<MatchParticipant> observedParticipants = new HashSet<MatchParticipant>();
+        private float nextHearingScan;
 
         public static TacticalTeamCoordinator EnsureExists()
         {
@@ -73,6 +79,12 @@ namespace PolyStrike.AI
                 if (participant == null || !observedParticipants.Add(participant))
                     continue;
                 participant.Died += OnParticipantDied;
+            }
+
+            if (Time.time >= nextHearingScan)
+            {
+                nextHearingScan = Time.time + HearingScanInterval;
+                ScanRunningFootsteps(participants);
             }
         }
 
@@ -214,6 +226,45 @@ namespace PolyStrike.AI
             var enemyCloserToOtherSite = Vector3.Distance(enemyPosition, ownAnchor) > 13f;
             var travelWouldMatter = Vector3.Distance(currentPosition, enemyPosition) > 5f;
             return enemyCloserToOtherSite && travelWouldMatter && Time.time - GetState(MatchTeam.CounterTerrorists).LastEnemySeenAt > 0.65f;
+        }
+
+        private void ScanRunningFootsteps(IReadOnlyList<MatchParticipant> participants)
+        {
+            for (var i = 0; i < participants.Count; i++)
+            {
+                var source = participants[i];
+                if (source == null || !source.IsAlive)
+                    continue;
+
+                var sourceMovement = source.GetComponent<PlayerMovement>();
+                if (sourceMovement == null || !sourceMovement.IsGrounded || sourceMovement.SpeedSourceUnits < RunningFootstepThreshold)
+                    continue;
+
+                var listenerTeam = source.Team == MatchTeam.Terrorists
+                    ? MatchTeam.CounterTerrorists
+                    : MatchTeam.Terrorists;
+                if (!AnyBotCanHear(participants, listenerTeam, source.transform.position))
+                    continue;
+
+                var error = Random.insideUnitSphere * 1.15f;
+                error.y = 0f;
+                ReportEnemy(listenerTeam, source.transform.position + error);
+            }
+        }
+
+        private static bool AnyBotCanHear(IReadOnlyList<MatchParticipant> participants, MatchTeam team, Vector3 sourcePosition)
+        {
+            var rangeSquared = HearingRange * HearingRange;
+            for (var i = 0; i < participants.Count; i++)
+            {
+                var listener = participants[i];
+                if (listener == null || !listener.IsAlive || listener.Team != team || listener.GetComponent<TacticalBotController>() == null)
+                    continue;
+
+                if ((listener.transform.position - sourcePosition).sqrMagnitude <= rangeSquared)
+                    return true;
+            }
+            return false;
         }
 
         private void OnParticipantDied(MatchParticipant dead)
