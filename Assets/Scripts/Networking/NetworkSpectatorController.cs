@@ -155,7 +155,7 @@ namespace PolyStrike.Networking
 
             if (!chaseMode)
             {
-                spectatorCamera.transform.SetPositionAndRotation(eye + rotation * Vector3.forward * 0.06f, rotation);
+                spectatorCamera.transform.SetPositionAndRotation(eye + rotation * Vector3.forward * 0.22f, rotation);
                 return;
             }
 
