@@ -11,11 +11,14 @@ namespace PolyStrike.Networking
         [GhostField(Quantization = 100)] public float Yaw;
         [GhostField(Quantization = 100)] public float Pitch;
         [GhostField(Quantization = 1000)] public float CrouchAmount;
+        [GhostField(Quantization = 1000)] public float VelocityModifier;
         [GhostField] public ushort Health;
         [GhostField] public ushort Armor;
+        [GhostField] public ushort Money;
         [GhostField] public byte Team;
         [GhostField] public byte ActiveWeapon;
         [GhostField] public byte MagazineAmmo;
+        [GhostField] public byte ReserveAmmo;
         [GhostField] public byte Flags;
     }
 
@@ -26,5 +29,8 @@ namespace PolyStrike.Networking
         public const byte Alive = 1 << 2;
         public const byte Planting = 1 << 3;
         public const byte Defusing = 1 << 4;
+        public const byte Helmet = 1 << 5;
+        public const byte DefuseKit = 1 << 6;
+        public const byte HasBomb = 1 << 7;
     }
 }
