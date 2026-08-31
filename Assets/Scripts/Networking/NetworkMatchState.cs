@@ -1,3 +1,4 @@
+using PolyStrike.Core;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.NetCode;
@@ -105,9 +106,9 @@ namespace PolyStrike.Networking
         public const int HalfRounds = 12;
         public const int RoundsToWin = 13;
 
-        public const float FreezeTime = 15f;
-        public const float BuyTime = 20f;
-        public const float RoundTime = 115.2f;
+        public static float FreezeTime => CompetitiveCvars.FreezeTime;
+        public static float BuyTime => CompetitiveCvars.BuyTime;
+        public static float RoundTime => CompetitiveCvars.RoundTime;
         public const float RoundRestartDelay = 7f;
         public const float HalfTimeDuration = 15f;
         public const float BombTimer = 40f;
@@ -115,8 +116,8 @@ namespace PolyStrike.Networking
         public const float DefuseTime = 10f;
         public const float DefuseKitTime = 5f;
 
-        public const int StartMoney = 800;
-        public const int MaxMoney = 16000;
+        public static int StartMoney => CompetitiveCvars.StartMoney;
+        public static int MaxMoney => CompetitiveCvars.MaxMoney;
         public const int BaseLossBonus = 1400;
         public const int LossBonusStep = 500;
         public const int MaximumLossLevel = 4;
