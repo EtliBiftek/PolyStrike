@@ -15,8 +15,10 @@ namespace PolyStrike.Match
         private HitscanWeapon weapon;
         private UtilityController utility;
         private C4Controller c4;
-        private Vector3 spawnPosition;
-        private Quaternion spawnRotation;
+        private Vector3 tSpawnPosition;
+        private Vector3 ctSpawnPosition;
+        private Quaternion tSpawnRotation;
+        private Quaternion ctSpawnRotation;
 
         public static IReadOnlyList<MatchParticipant> All => Participants;
 
@@ -27,7 +29,7 @@ namespace PolyStrike.Match
         public bool CarriesBomb { get; private set; }
         public Health Health => health;
         public bool IsAlive => health != null && !health.IsDead;
-        public Vector3 SpawnPosition => spawnPosition;
+        public Vector3 SpawnPosition => Team == MatchTeam.Terrorists ? tSpawnPosition : ctSpawnPosition;
 
         public event Action<MatchParticipant> Died;
         public event Action<int> MoneyChanged;
@@ -36,8 +38,10 @@ namespace PolyStrike.Match
         private void Awake()
         {
             health = GetComponent<Health>();
-            spawnPosition = transform.position;
-            spawnRotation = transform.rotation;
+            tSpawnPosition = transform.position;
+            ctSpawnPosition = transform.position;
+            tSpawnRotation = transform.rotation;
+            ctSpawnRotation = transform.rotation;
             health.Died += OnDeath;
         }
 
@@ -70,6 +74,15 @@ namespace PolyStrike.Match
 
             if (localPlayer && GetComponent<PlayerDropController>() == null)
                 gameObject.AddComponent<PlayerDropController>();
+        }
+
+        public void ConfigureTeamSpawns(Vector3 terroristSpawn, Quaternion terroristRotation, Vector3 counterTerroristSpawn, Quaternion counterTerroristRotation)
+        {
+            tSpawnPosition = terroristSpawn;
+            tSpawnRotation = terroristRotation;
+            ctSpawnPosition = counterTerroristSpawn;
+            ctSpawnRotation = counterTerroristRotation;
+            RestoreSpawn();
         }
 
         public void SetLoadoutReferences(HitscanWeapon hitscanWeapon, UtilityController utilityController)
@@ -122,7 +135,7 @@ namespace PolyStrike.Match
 
         public bool IsInBuyZone(float radius = 4.5f)
         {
-            var delta = transform.position - spawnPosition;
+            var delta = transform.position - SpawnPosition;
             delta.y = 0f;
             return delta.sqrMagnitude <= radius * radius;
         }
@@ -259,7 +272,10 @@ namespace PolyStrike.Match
 
         private void RestoreSpawn()
         {
-            transform.SetPositionAndRotation(spawnPosition, spawnRotation);
+            if (Team == MatchTeam.Terrorists)
+                transform.SetPositionAndRotation(tSpawnPosition, tSpawnRotation);
+            else
+                transform.SetPositionAndRotation(ctSpawnPosition, ctSpawnRotation);
         }
 
         private void OnEnemyKilled(int reward)
