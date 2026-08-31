@@ -289,11 +289,23 @@ namespace PolyStrike.Networking
         private const float SmokeRadius = 2.2f;
 
         private EntityQuery playerQuery;
+        private EntityQuery projectileQuery;
+        private EntityQuery smokeQuery;
+        private EntityQuery infernoQuery;
 
         public void OnCreate(ref SystemState state)
         {
             playerQuery = SystemAPI.QueryBuilder()
                 .WithAll<NetworkPlayerState, NetworkFlashState>()
+                .Build();
+            projectileQuery = SystemAPI.QueryBuilder()
+                .WithAll<NetworkGrenadeProjectile>()
+                .Build();
+            smokeQuery = SystemAPI.QueryBuilder()
+                .WithAll<NetworkSmokeArea>()
+                .Build();
+            infernoQuery = SystemAPI.QueryBuilder()
+                .WithAll<NetworkInfernoArea>()
                 .Build();
         }
 
@@ -301,15 +313,21 @@ namespace PolyStrike.Networking
         {
             var deltaTime = SystemAPI.Time.DeltaTime;
             var players = playerQuery.ToEntityArray(Allocator.Temp);
+            var projectiles = projectileQuery.ToEntityArray(Allocator.Temp);
+            var smokes = smokeQuery.ToEntityArray(Allocator.Temp);
+            var infernos = infernoQuery.ToEntityArray(Allocator.Temp);
             var commandBuffer = new EntityCommandBuffer(Allocator.Temp);
 
             TickFlash(ref state, players, deltaTime);
-            TickSmoke(ref commandBuffer, deltaTime);
-            TickInfernos(ref state, ref commandBuffer, players, deltaTime);
-            TickProjectiles(ref state, ref commandBuffer, players, deltaTime);
+            TickSmoke(ref state, ref commandBuffer, smokes, deltaTime);
+            TickInfernos(ref state, ref commandBuffer, players, smokes, infernos, deltaTime);
+            TickProjectiles(ref state, ref commandBuffer, players, smokes, projectiles, deltaTime);
 
             commandBuffer.Playback(state.EntityManager);
             commandBuffer.Dispose();
+            infernos.Dispose();
+            smokes.Dispose();
+            projectiles.Dispose();
             players.Dispose();
         }
 
@@ -317,11 +335,17 @@ namespace PolyStrike.Networking
             ref SystemState state,
             ref EntityCommandBuffer commandBuffer,
             NativeArray<Entity> players,
+            NativeArray<Entity> smokes,
+            NativeArray<Entity> projectiles,
             float deltaTime)
         {
-            foreach (var (projectile, entity) in SystemAPI.Query<RefRW<NetworkGrenadeProjectile>>().WithEntityAccess())
+            for (var i = 0; i < projectiles.Length; i++)
             {
-                ref var grenade = ref projectile.ValueRW;
+                var entity = projectiles[i];
+                if (!state.EntityManager.Exists(entity))
+                    continue;
+
+                var grenade = state.EntityManager.GetComponentData<NetworkGrenadeProjectile>(entity);
                 grenade.Age += deltaTime;
                 grenade.Velocity.y -= GrenadeRules.Gravity / SourceUnitsPerMeter * deltaTime;
 
@@ -351,7 +375,8 @@ namespace PolyStrike.Networking
                     grenade.Position.y = NetworkSandlineCollision.GroundY + 0.06f;
                     if (grenade.Velocity.y < 0f)
                         grenade.Velocity.y = -grenade.Velocity.y * GrenadeRules.BounceScale;
-                    grenade.Velocity.xz *= 0.82f;
+                    grenade.Velocity.x *= 0.82f;
+                    grenade.Velocity.z *= 0.82f;
                 }
 
                 var shouldDetonate = (GrenadeType)grenade.Type switch
@@ -364,11 +389,14 @@ namespace PolyStrike.Networking
                     _ => true
                 };
 
-                if (!shouldDetonate)
+                if (shouldDetonate)
+                {
+                    Detonate(ref state, ref commandBuffer, players, smokes, in grenade);
+                    commandBuffer.DestroyEntity(entity);
                     continue;
+                }
 
-                Detonate(ref state, ref commandBuffer, players, in grenade);
-                commandBuffer.DestroyEntity(entity);
+                state.EntityManager.SetComponentData(entity, grenade);
             }
         }
 
@@ -376,6 +404,7 @@ namespace PolyStrike.Networking
             ref SystemState state,
             ref EntityCommandBuffer commandBuffer,
             NativeArray<Entity> players,
+            NativeArray<Entity> smokes,
             in NetworkGrenadeProjectile grenade)
         {
             PublishDetonation(ref state, grenade.Owner, grenade.Type, grenade.Position);
@@ -396,7 +425,7 @@ namespace PolyStrike.Networking
                     });
                     break;
                 case GrenadeType.Molotov:
-                    if (!IsInsideSmoke(grenade.Position))
+                    if (!IsInsideSmoke(ref state, smokes, grenade.Position))
                     {
                         commandBuffer.AddComponent(commandBuffer.CreateEntity(), new NetworkInfernoArea
                         {
@@ -501,13 +530,21 @@ namespace PolyStrike.Networking
             }
         }
 
-        private static void TickSmoke(ref EntityCommandBuffer commandBuffer, float deltaTime)
+        private static void TickSmoke(
+            ref SystemState state,
+            ref EntityCommandBuffer commandBuffer,
+            NativeArray<Entity> smokes,
+            float deltaTime)
         {
-            foreach (var (smoke, entity) in SystemAPI.Query<RefRW<NetworkSmokeArea>>().WithEntityAccess())
+            for (var i = 0; i < smokes.Length; i++)
             {
-                smoke.ValueRW.Remaining -= deltaTime;
-                if (smoke.ValueRO.Remaining <= 0f)
+                var entity = smokes[i];
+                var smoke = state.EntityManager.GetComponentData<NetworkSmokeArea>(entity);
+                smoke.Remaining -= deltaTime;
+                if (smoke.Remaining <= 0f)
                     commandBuffer.DestroyEntity(entity);
+                else
+                    state.EntityManager.SetComponentData(entity, smoke);
             }
         }
 
@@ -515,53 +552,59 @@ namespace PolyStrike.Networking
             ref SystemState state,
             ref EntityCommandBuffer commandBuffer,
             NativeArray<Entity> players,
+            NativeArray<Entity> smokes,
+            NativeArray<Entity> infernos,
             float deltaTime)
         {
-            foreach (var (inferno, entity) in SystemAPI.Query<RefRW<NetworkInfernoArea>>().WithEntityAccess())
+            for (var i = 0; i < infernos.Length; i++)
             {
-                ref var fire = ref inferno.ValueRW;
+                var entity = infernos[i];
+                var fire = state.EntityManager.GetComponentData<NetworkInfernoArea>(entity);
                 fire.Remaining -= deltaTime;
-                if (fire.Remaining <= 0f || IsInsideSmoke(fire.Position))
+                if (fire.Remaining <= 0f || IsInsideSmoke(ref state, smokes, fire.Position))
                 {
                     commandBuffer.DestroyEntity(entity);
                     continue;
                 }
 
                 fire.DamageTick -= deltaTime;
-                if (fire.DamageTick > 0f)
-                    continue;
-
-                fire.DamageTick += GrenadeRules.InfernoDamageTick;
-                var damage = GrenadeRules.InfernoDamagePerSecond * GrenadeRules.InfernoDamageTick;
-
-                for (var i = 0; i < players.Length; i++)
+                if (fire.DamageTick <= 0f)
                 {
-                    var targetEntity = players[i];
-                    var target = state.EntityManager.GetComponentData<NetworkPlayerState>(targetEntity);
-                    if ((target.Flags & NetworkPlayerFlags.Alive) == 0)
-                        continue;
+                    fire.DamageTick += GrenadeRules.InfernoDamageTick;
+                    var damage = GrenadeRules.InfernoDamagePerSecond * GrenadeRules.InfernoDamageTick;
 
-                    var horizontal = target.Position.xz - fire.Position.xz;
-                    if (math.lengthsq(horizontal) > InfernoRadius * InfernoRadius)
-                        continue;
-
-                    var dealt = target.Team == fire.Team && targetEntity != fire.Owner ? damage * 0.5f : damage;
-                    target.Health = (ushort)math.max(0, (int)target.Health - (int)math.floor(dealt));
-                    if (target.Health == 0)
+                    for (var playerIndex = 0; playerIndex < players.Length; playerIndex++)
                     {
-                        target.Flags &= unchecked((byte)~NetworkPlayerFlags.Alive);
-                        target.Velocity = float3.zero;
+                        var targetEntity = players[playerIndex];
+                        var target = state.EntityManager.GetComponentData<NetworkPlayerState>(targetEntity);
+                        if ((target.Flags & NetworkPlayerFlags.Alive) == 0)
+                            continue;
+
+                        var horizontal = target.Position.xz - fire.Position.xz;
+                        if (math.lengthsq(horizontal) > InfernoRadius * InfernoRadius)
+                            continue;
+
+                        var dealt = target.Team == fire.Team && targetEntity != fire.Owner ? damage * 0.5f : damage;
+                        target.Health = (ushort)math.max(0, (int)target.Health - (int)math.floor(dealt));
+                        if (target.Health == 0)
+                        {
+                            target.Flags &= unchecked((byte)~NetworkPlayerFlags.Alive);
+                            target.Velocity = float3.zero;
+                        }
+                        state.EntityManager.SetComponentData(targetEntity, target);
                     }
-                    state.EntityManager.SetComponentData(targetEntity, target);
                 }
+
+                state.EntityManager.SetComponentData(entity, fire);
             }
         }
 
-        private static bool IsInsideSmoke(float3 point)
+        private static bool IsInsideSmoke(ref SystemState state, NativeArray<Entity> smokes, float3 point)
         {
-            foreach (var smoke in SystemAPI.Query<RefRO<NetworkSmokeArea>>())
+            for (var i = 0; i < smokes.Length; i++)
             {
-                if (math.distancesq(smoke.ValueRO.Position, point) <= SmokeRadius * SmokeRadius)
+                var smoke = state.EntityManager.GetComponentData<NetworkSmokeArea>(smokes[i]);
+                if (math.distancesq(smoke.Position, point) <= SmokeRadius * SmokeRadius)
                     return true;
             }
             return false;
