@@ -52,6 +52,9 @@ namespace PolyStrike.Networking
                 AddComponent<NetworkInteractionState>(entity);
                 AddComponent<NetworkMatchSnapshot>(entity);
                 AddComponent<NetworkLoadoutState>(entity);
+                AddComponent<NetworkUtilityRuntime>(entity);
+                AddComponent<NetworkUtilityPresentationState>(entity);
+                AddComponent<NetworkFlashState>(entity);
                 AddBuffer<NetworkPlayerPoseHistory>(entity);
             }
         }
