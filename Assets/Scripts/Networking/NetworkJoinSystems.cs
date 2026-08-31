@@ -104,7 +104,7 @@ namespace PolyStrike.Networking
                 var networkId = SystemAPI.GetComponent<NetworkId>(connection).Value;
                 commandBuffer.SetComponent(player, new GhostOwner { NetworkId = networkId });
 
-                var position = GetSpawn(team, slot);
+                var position = NetworkSandlineCollision.GetSpawn(team, slot);
                 var yaw = team == 0 ? 0f : 180f;
                 commandBuffer.SetComponent(player, LocalTransform.FromPositionRotation(
                     position,
@@ -163,12 +163,6 @@ namespace PolyStrike.Networking
 
             commandBuffer.Playback(state.EntityManager);
             commandBuffer.Dispose();
-        }
-
-        private static float3 GetSpawn(byte team, int slot)
-        {
-            var x = -1.6f + math.clamp(slot, 0, 4) * 0.8f;
-            return new float3(x, NetworkSandlineCollision.GroundY, team == 0 ? -24f : 24f);
         }
     }
 }
