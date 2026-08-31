@@ -22,6 +22,7 @@ namespace PolyStrike.Networking
         public const byte Headshot = 1 << 0;
         public const byte TeamKill = 1 << 1;
         public const byte Suicide = 1 << 2;
+        public const byte Environment = 1 << 3;
     }
 
     public static class NetworkKillFeedServer
@@ -42,8 +43,7 @@ namespace PolyStrike.Networking
             if (suicide)
                 flags |= NetworkKillFeedFlags.Suicide;
 
-            var rpcEntity = state.EntityManager.CreateEntity(typeof(NetworkKillFeedRpc), typeof(SendRpcCommandRequest));
-            state.EntityManager.SetComponentData(rpcEntity, new NetworkKillFeedRpc
+            Send(ref state, new NetworkKillFeedRpc
             {
                 KillerName = killer.PlayerName,
                 VictimName = victim.PlayerName,
@@ -52,6 +52,25 @@ namespace PolyStrike.Networking
                 Weapon = weapon,
                 Flags = flags
             });
+        }
+
+        public static void BroadcastEnvironment(ref SystemState state, in NetworkPlayerState victim, byte weapon)
+        {
+            Send(ref state, new NetworkKillFeedRpc
+            {
+                KillerName = default,
+                VictimName = victim.PlayerName,
+                KillerTeam = byte.MaxValue,
+                VictimTeam = victim.Team,
+                Weapon = weapon,
+                Flags = NetworkKillFeedFlags.Environment
+            });
+        }
+
+        private static void Send(ref SystemState state, in NetworkKillFeedRpc rpc)
+        {
+            var rpcEntity = state.EntityManager.CreateEntity(typeof(NetworkKillFeedRpc), typeof(SendRpcCommandRequest));
+            state.EntityManager.SetComponentData(rpcEntity, rpc);
             state.EntityManager.SetComponentData(rpcEntity, new SendRpcCommandRequest
             {
                 TargetConnection = Entity.Null
@@ -150,8 +169,11 @@ namespace PolyStrike.Networking
                 var suicide = (entry.Flags & NetworkKillFeedFlags.Suicide) != 0
                     ? "  " + Localization.Get("killfeed.suicide")
                     : string.Empty;
+                var environment = (entry.Flags & NetworkKillFeedFlags.Environment) != 0;
 
-                var text = $"{entry.Killer}   {weapon}{headshot}{teamKill}{suicide}   {entry.Victim}";
+                var text = environment
+                    ? $"{weapon}   {entry.Victim}"
+                    : $"{entry.Killer}   {weapon}{headshot}{teamKill}{suicide}   {entry.Victim}";
                 var width = Mathf.Clamp(rowStyle.CalcSize(new GUIContent(text)).x + 20f, 260f, 560f);
                 GUI.Box(new Rect(Screen.width - width - 22f, y, width, 28f), text, rowStyle);
                 y += 31f;
