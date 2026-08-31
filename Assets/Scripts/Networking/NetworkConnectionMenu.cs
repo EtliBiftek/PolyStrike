@@ -29,6 +29,7 @@ namespace PolyStrike.Networking
             DontDestroyOnLoad(root);
             root.AddComponent<NetworkConnectionMenu>();
             root.AddComponent<NetworkClientPresentation>();
+            root.AddComponent<NetworkScoreboardOverlay>();
             root.AddComponent<NetworkBuyMenu>();
         }
 
