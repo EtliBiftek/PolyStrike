@@ -63,9 +63,9 @@ namespace PolyStrike.Networking
                     BindParticipantEvents();
                     await VivoxService.Instance.LoginAsync(new LoginOptions
                     {
-                        DisplayName = NetworkConnectionMenu.LocalPlayerName,
-                        DisableAutomaticChannelTransmissionSwap = true
+                        DisplayName = NetworkConnectionMenu.LocalPlayerName
                     });
+                    await VivoxService.Instance.SetChannelTransmissionModeAsync(TransmissionMode.None);
                     await VivoxService.Instance.EnableAutoVoiceActivityDetectionAsync();
                     serviceReady = true;
                 }
