@@ -43,7 +43,7 @@ namespace PolyStrike.Networking
                     VelocityModifier = 1f,
                     Health = 100,
                     Armor = 0,
-                    Money = NetworkMatchRules.StartMoney,
+                    Money = (ushort)NetworkMatchRules.StartMoney,
                     Flags = NetworkPlayerFlags.Alive | NetworkPlayerFlags.Grounded
                 });
                 AddComponent<NetworkPlayerInput>(entity);
