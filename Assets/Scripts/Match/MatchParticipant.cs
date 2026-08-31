@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using PolyStrike.Core;
 using PolyStrike.Gameplay;
 using PolyStrike.Player;
 using UnityEngine;
@@ -142,6 +143,10 @@ namespace PolyStrike.Match
 
         public bool IsInBuyZone(float radius = 4.5f)
         {
+            var mode = CompetitiveCvars.BuyAnywhere;
+            if (mode == 1 || (mode == 2 && Team == MatchTeam.Terrorists) || (mode == 3 && Team == MatchTeam.CounterTerrorists))
+                return true;
+
             var delta = transform.position - SpawnPosition;
             delta.y = 0f;
             return delta.sqrMagnitude <= radius * radius;
