@@ -12,10 +12,19 @@ namespace PolyStrike.Networking
         {
             var commandBuffer = new EntityCommandBuffer(Allocator.Temp);
 
-            foreach (var (_, entity) in SystemAPI.Query<RefRO<NetworkId>>().WithAll<NetworkStreamConnection>().WithEntityAccess())
+            foreach (var (_, entity) in SystemAPI.Query<RefRO<NetworkId>>()
+                         .WithAll<NetworkStreamConnection>()
+                         .WithNone<ClientJoinRequestSent>()
+                         .WithEntityAccess())
             {
                 if (!SystemAPI.HasComponent<NetworkStreamInGame>(entity))
                     commandBuffer.AddComponent<NetworkStreamInGame>(entity);
+
+                commandBuffer.AddComponent<ClientJoinRequestSent>(entity);
+
+                var rpc = commandBuffer.CreateEntity();
+                commandBuffer.AddComponent<NetworkJoinRequest>(rpc);
+                commandBuffer.AddComponent(rpc, new SendRpcCommandRequest { TargetConnection = entity });
             }
 
             commandBuffer.Playback(state.EntityManager);
