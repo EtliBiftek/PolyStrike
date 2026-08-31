@@ -294,6 +294,18 @@ namespace PolyStrike.Core
             }
         }
 
+        public static bool ScoreboardHeld
+        {
+            get
+            {
+#if ENABLE_INPUT_SYSTEM
+                return Keyboard.current?.tabKey.isPressed == true;
+#else
+                return Input.GetKey(KeyCode.Tab);
+#endif
+            }
+        }
+
         public static bool EscapePressed
         {
             get
