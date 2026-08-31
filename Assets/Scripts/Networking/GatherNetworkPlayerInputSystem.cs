@@ -1,4 +1,5 @@
 using PolyStrike.Core;
+using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.NetCode;
@@ -10,17 +11,37 @@ namespace PolyStrike.Networking
     {
         private const float LookSensitivity = 0.085f;
 
+        private EntityQuery localPlayerQuery;
         private float yaw;
         private float pitch;
+        private bool viewInitialized;
 
         protected override void OnCreate()
         {
             RequireForUpdate<NetworkPlayerInput>();
             RequireForUpdate<NetworkTime>();
+            localPlayerQuery = GetEntityQuery(
+                ComponentType.ReadOnly<NetworkPlayerState>(),
+                ComponentType.ReadOnly<GhostOwnerIsLocal>());
         }
 
         protected override void OnUpdate()
         {
+            if (!viewInitialized)
+            {
+                var states = localPlayerQuery.ToComponentDataArray<NetworkPlayerState>(Allocator.Temp);
+                if (states.Length == 0)
+                {
+                    states.Dispose();
+                    return;
+                }
+
+                yaw = states[0].Yaw;
+                pitch = states[0].Pitch;
+                viewInitialized = true;
+                states.Dispose();
+            }
+
             var move = GameInput.Movement;
             var lookDelta = GameInput.MouseDelta * LookSensitivity;
             yaw = WrapAngle(yaw + lookDelta.x);
