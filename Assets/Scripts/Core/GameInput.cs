@@ -7,7 +7,7 @@ namespace PolyStrike.Core
 {
     public static class GameInput
     {
-        private static bool Blocked => DeveloperConsole.IsOpen;
+        private static bool Blocked => DeveloperConsole.IsOpen || PauseMenu.IsOpen || AlphaStartMenu.IsOpen;
 
         public static Vector2 Movement
         {
