@@ -1,7 +1,6 @@
 using System;
 using PolyStrike.Core;
 using PolyStrike.Match;
-using PolyStrike.Player;
 using Unity.Entities;
 using Unity.NetCode;
 using Unity.Networking.Transport;
@@ -27,6 +26,7 @@ namespace PolyStrike.Networking
             DontDestroyOnLoad(root);
             root.AddComponent<NetworkConnectionMenu>();
             root.AddComponent<NetworkClientPresentation>();
+            root.AddComponent<NetworkBuyMenu>();
         }
 
         private void Update()
@@ -172,8 +172,10 @@ namespace PolyStrike.Networking
             if (!IsUsable(clientWorld))
                 return false;
 
-            using var query = clientWorld.EntityManager.CreateEntityQuery(typeof(NetworkId));
-            return query.CalculateEntityCount() > 0;
+            var query = clientWorld.EntityManager.CreateEntityQuery(typeof(NetworkId));
+            var connected = query.CalculateEntityCount() > 0;
+            query.Dispose();
+            return connected;
         }
 
         private static bool IsUsable(World world) => world != null && world.IsCreated;
