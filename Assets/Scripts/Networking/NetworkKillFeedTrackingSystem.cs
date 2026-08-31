@@ -1,3 +1,4 @@
+using PolyStrike.Gameplay;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -63,6 +64,8 @@ namespace PolyStrike.Networking
                 return;
             }
 
+            var bombExplosion = SystemAPI.TryGetSingleton<NetworkMatchRuntime>(out var matchRuntime) &&
+                                matchRuntime.LastReason == NetworkRoundEndReason.BombExploded;
             var infernos = infernoQuery.ToEntityArray(Allocator.Temp);
             var killers = new NativeList<KillerChange>(Allocator.Temp);
             var victims = new NativeList<VictimChange>(Allocator.Temp);
@@ -86,8 +89,8 @@ namespace PolyStrike.Networking
                     continue;
                 }
 
-                var killDelta = player.Kills >= old.Kills ? player.Kills - old.Kills : 0;
-                var deathDelta = player.Deaths >= old.Deaths ? player.Deaths - old.Deaths : 0;
+                var killDelta = math.max(0, (int)player.Kills - old.Kills);
+                var deathDelta = math.max(0, (int)player.Deaths - old.Deaths);
                 var diedThisTick = old.Alive != 0 && alive == 0;
 
                 if (diedThisTick && deathDelta == 0)
@@ -104,7 +107,7 @@ namespace PolyStrike.Networking
                         Entity = entity,
                         State = player,
                         Utility = utility,
-                        RemainingKills = killDelta,
+                        RemainingKills = (ushort)math.min(ushort.MaxValue, killDelta),
                         RecentDetonateType = utility.DetonateSequence != old.DetonateSequence
                             ? utility.DetonateType
                             : byte.MaxValue
@@ -140,8 +143,10 @@ namespace PolyStrike.Networking
                 }
                 else
                 {
-                    var cause = IsBombExplosion(ref state) ? (byte)11 : (byte)0;
-                    NetworkKillFeedServer.BroadcastEnvironment(ref state, in victim.State, cause);
+                    NetworkKillFeedServer.BroadcastEnvironment(
+                        ref state,
+                        in victim.State,
+                        bombExplosion ? (byte)11 : (byte)0);
                 }
             }
 
@@ -200,7 +205,7 @@ namespace PolyStrike.Networking
             if (HasOwnedInfernoNear(ref state, killer.Entity, victim.State.Position, infernos))
                 return 2000f;
 
-            if (killer.RecentDetonateType == (byte)Gameplay.GrenadeType.HighExplosive)
+            if (killer.RecentDetonateType == (byte)GrenadeType.HighExplosive)
                 return 1500f - math.distance(killer.Utility.DetonatePosition, victim.State.Position);
 
             var toVictim = victim.State.Position - killer.State.Position;
@@ -228,7 +233,7 @@ namespace PolyStrike.Networking
             if (HasOwnedInfernoNear(ref state, killer.Entity, victim.State.Position, infernos))
                 return 10;
 
-            if (killer.RecentDetonateType == (byte)Gameplay.GrenadeType.HighExplosive)
+            if (killer.RecentDetonateType == (byte)GrenadeType.HighExplosive)
                 return 6;
 
             return killer.State.ActiveWeapon is 1 or 2 ? killer.State.ActiveWeapon : (byte)0;
@@ -252,12 +257,6 @@ namespace PolyStrike.Networking
             }
 
             return false;
-        }
-
-        private static bool IsBombExplosion(ref SystemState state)
-        {
-            return SystemAPI.TryGetSingleton<NetworkMatchRuntime>(out var runtime) &&
-                   runtime.LastReason == NetworkRoundEndReason.BombExploded;
         }
     }
 }
