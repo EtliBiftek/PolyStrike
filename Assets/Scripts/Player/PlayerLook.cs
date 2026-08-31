@@ -101,7 +101,7 @@ namespace PolyStrike.Player
             if (cameraTransform == null)
                 return;
 
-            var delta = GameInput.MouseDelta * sensitivity;
+            var delta = GameInput.MouseDelta * (sensitivity * CompetitiveCvars.Sensitivity);
             pitch = Mathf.Clamp(pitch - delta.y, -89f, 89f);
             transform.Rotate(0f, delta.x, 0f, Space.Self);
 
