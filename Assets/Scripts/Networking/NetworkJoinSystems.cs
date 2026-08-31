@@ -1,3 +1,4 @@
+using System;
 using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
@@ -22,6 +23,11 @@ namespace PolyStrike.Networking
         public byte Slot;
     }
 
+    public struct NetworkVoiceRoomState : IComponentData
+    {
+        public FixedString64Bytes RoomId;
+    }
+
     [WorldSystemFilter(WorldSystemFilterFlags.ServerSimulation)]
     [UpdateInGroup(typeof(ServerSimulationSystemGroup))]
     public partial struct ServerNetworkPlayerSpawnSystem : ISystem
@@ -29,6 +35,12 @@ namespace PolyStrike.Networking
         public void OnCreate(ref SystemState state)
         {
             state.RequireForUpdate<NetworkGameSetup>();
+
+            var roomEntity = state.EntityManager.CreateEntity();
+            state.EntityManager.AddComponentData(roomEntity, new NetworkVoiceRoomState
+            {
+                RoomId = new FixedString64Bytes($"ps-{DateTime.UtcNow.Ticks:x}")
+            });
         }
 
         public void OnUpdate(ref SystemState state)
@@ -37,6 +49,7 @@ namespace PolyStrike.Networking
             if (setup.PlayerGhostPrefab == Entity.Null)
                 return;
 
+            var voiceRoom = SystemAPI.GetSingleton<NetworkVoiceRoomState>().RoomId;
             var terroristCount = 0;
             var counterTerroristCount = 0;
             foreach (var playerConnection in SystemAPI.Query<RefRO<NetworkPlayerConnection>>())
@@ -103,6 +116,7 @@ namespace PolyStrike.Networking
                 commandBuffer.SetComponent(player, new NetworkPlayerState
                 {
                     PlayerName = join.ValueRO.PlayerName,
+                    VoiceRoom = voiceRoom,
                     Position = position,
                     Velocity = float3.zero,
                     Yaw = yaw,
