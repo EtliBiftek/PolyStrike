@@ -119,6 +119,32 @@ namespace PolyStrike.Gameplay
             return false;
         }
 
+        public static bool BlocksLineOfSight(Vector3 start, Vector3 end)
+        {
+            var segment = end - start;
+            var lengthSquared = segment.sqrMagnitude;
+            if (lengthSquared < 0.0001f)
+                return false;
+
+            for (var i = Active.Count - 1; i >= 0; i--)
+            {
+                var cloud = Active[i];
+                if (cloud == null || cloud.radiusMeters <= 0f)
+                    continue;
+
+                var center = cloud.Center + Vector3.up * cloud.radiusMeters * 0.30f;
+                var t = Mathf.Clamp01(Vector3.Dot(center - start, segment) / lengthSquared);
+                var nearest = start + segment * t;
+                var offset = nearest - center;
+                offset.y *= 0.75f;
+                var blockingRadius = cloud.radiusMeters * 0.82f;
+                if (offset.sqrMagnitude <= blockingRadius * blockingRadius)
+                    return true;
+            }
+
+            return false;
+        }
+
         public static void PunchLine(Vector3 start, Vector3 end)
         {
             for (var i = Active.Count - 1; i >= 0; i--)
