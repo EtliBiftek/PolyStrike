@@ -25,6 +25,8 @@ namespace PolyStrike.Networking
         private Camera localCamera;
         private Entity localPlayer = Entity.Null;
         private NetworkPlayerState localState;
+        private NetworkMatchSnapshot matchSnapshot;
+        private bool hasMatchSnapshot;
         private int playerCount;
 
         private static readonly Color TerroristColor = new Color(0.55f, 0.36f, 0.18f);
@@ -36,6 +38,7 @@ namespace PolyStrike.Networking
             if (world == null || !world.IsCreated)
             {
                 ClearViews();
+                hasMatchSnapshot = false;
                 return;
             }
 
@@ -73,6 +76,8 @@ namespace PolyStrike.Networking
             entities.Dispose();
             query.Dispose();
 
+            ReadMatchSnapshot(entityManager);
+
             for (var i = 0; i < staleEntities.Count; i++)
                 RemoveRemoteView(staleEntities[i]);
 
@@ -94,13 +99,17 @@ namespace PolyStrike.Networking
             };
             style.normal.textColor = Color.white;
 
+            DrawMatchHud(style);
+
             var bottom = Screen.height - 24f;
             GUI.Label(new Rect(24f, bottom - 86f, 280f, 28f), Format("hud.health", localState.Health), style);
             GUI.Label(new Rect(24f, bottom - 58f, 280f, 28f), Format("hud.armor", localState.Armor), style);
             GUI.Label(new Rect(24f, bottom - 30f, 280f, 28f), Format("hud.money", localState.Money), style);
 
-            var ammo = $"{localState.MagazineAmmo} / {localState.ReserveAmmo}";
-            GUI.Label(new Rect(Screen.width - 230f, bottom - 46f, 210f, 32f), ammo, new GUIStyle(style)
+            var ammo = Localization.Get("hud.ammo")
+                .Replace("{0}", localState.MagazineAmmo.ToString())
+                .Replace("{1}", localState.ReserveAmmo.ToString());
+            GUI.Label(new Rect(Screen.width - 300f, bottom - 46f, 280f, 32f), ammo, new GUIStyle(style)
             {
                 alignment = TextAnchor.LowerRight,
                 fontSize = 22
@@ -112,6 +121,122 @@ namespace PolyStrike.Networking
             {
                 alignment = TextAnchor.UpperRight
             });
+        }
+
+        private void ReadMatchSnapshot(EntityManager entityManager)
+        {
+            var query = entityManager.CreateEntityQuery(ComponentType.ReadOnly<NetworkMatchSnapshot>());
+            if (query.CalculateEntityCount() == 0)
+            {
+                hasMatchSnapshot = false;
+                query.Dispose();
+                return;
+            }
+
+            var snapshots = query.ToComponentDataArray<NetworkMatchSnapshot>(Allocator.Temp);
+            matchSnapshot = snapshots[0];
+            hasMatchSnapshot = true;
+            snapshots.Dispose();
+            query.Dispose();
+        }
+
+        private void DrawMatchHud(GUIStyle baseStyle)
+        {
+            if (!hasMatchSnapshot)
+                return;
+
+            var centered = new GUIStyle(baseStyle)
+            {
+                alignment = TextAnchor.UpperCenter,
+                fontSize = 20
+            };
+
+            var score = Localization.Get("hud.score")
+                .Replace("{0}", matchSnapshot.TerroristScore.ToString())
+                .Replace("{1}", matchSnapshot.CounterTerroristScore.ToString());
+            GUI.Label(new Rect(Screen.width * 0.5f - 180f, 16f, 360f, 30f), score, centered);
+
+            var round = Localization.Get("hud.round")
+                .Replace("{0}", matchSnapshot.RoundNumber.ToString())
+                .Replace("{1}", NetworkMatchRules.RegulationRounds.ToString());
+            GUI.Label(new Rect(Screen.width * 0.5f - 180f, 42f, 360f, 28f), round, centered);
+
+            if (matchSnapshot.Phase == NetworkMatchPhase.Waiting)
+            {
+                GUI.Label(new Rect(Screen.width * 0.5f - 220f, 68f, 440f, 28f), Localization.Get("network.waiting"), centered);
+                return;
+            }
+
+            var phaseText = Localization.Get(GetPhaseKey(matchSnapshot.Phase));
+            var timer = matchSnapshot.Phase == NetworkMatchPhase.PostPlant
+                ? matchSnapshot.BombTimeRemaining
+                : matchSnapshot.PhaseTimeRemaining;
+            var phaseLine = Localization.Get("network.phase_time")
+                .Replace("{0}", phaseText)
+                .Replace("{1}", Mathf.Max(0f, timer).ToString("0.0"));
+            GUI.Label(new Rect(Screen.width * 0.5f - 220f, 68f, 440f, 28f), phaseLine, centered);
+
+            if (matchSnapshot.BombPlanted != 0)
+            {
+                var bombTimer = Localization.Get("hud.bomb_timer")
+                    .Replace("{0}", Mathf.Max(0f, matchSnapshot.BombTimeRemaining).ToString("0.0"));
+                GUI.Label(new Rect(Screen.width * 0.5f - 180f, 94f, 360f, 28f), bombTimer, centered);
+            }
+
+            if ((localState.Flags & NetworkPlayerFlags.Planting) != 0)
+            {
+                var planting = Localization.Get("hud.planting")
+                    .Replace("{0}", Mathf.RoundToInt(matchSnapshot.InteractionProgress * 100f).ToString());
+                GUI.Label(new Rect(Screen.width * 0.5f - 220f, Screen.height * 0.62f, 440f, 30f), planting, centered);
+            }
+            else if ((localState.Flags & NetworkPlayerFlags.Defusing) != 0)
+            {
+                var defusing = Localization.Get("hud.defusing")
+                    .Replace("{0}", Mathf.RoundToInt(matchSnapshot.InteractionProgress * 100f).ToString());
+                GUI.Label(new Rect(Screen.width * 0.5f - 220f, Screen.height * 0.62f, 440f, 30f), defusing, centered);
+            }
+
+            if (matchSnapshot.Phase == NetworkMatchPhase.RoundEnd && matchSnapshot.LastWinner <= 1)
+            {
+                var winner = matchSnapshot.LastWinner == 0 ? Localization.Get("team.t") : Localization.Get("team.ct");
+                var reason = Localization.Get(GetReasonKey(matchSnapshot.LastReason));
+                var result = Localization.Get("hud.round_winner")
+                    .Replace("{0}", winner)
+                    .Replace("{1}", reason);
+                GUI.Label(new Rect(Screen.width * 0.5f - 300f, Screen.height * 0.28f, 600f, 32f), result, centered);
+            }
+
+            if (matchSnapshot.BuyTimeRemaining > 0f &&
+                (matchSnapshot.Phase == NetworkMatchPhase.FreezeTime || matchSnapshot.Phase == NetworkMatchPhase.Live))
+            {
+                GUI.Label(new Rect(Screen.width * 0.5f - 180f, Screen.height - 64f, 360f, 28f), Localization.Get("network.buy_hint"), centered);
+            }
+        }
+
+        private static string GetPhaseKey(NetworkMatchPhase phase)
+        {
+            return phase switch
+            {
+                NetworkMatchPhase.FreezeTime => "match.phase.freeze",
+                NetworkMatchPhase.Live => "match.phase.live",
+                NetworkMatchPhase.PostPlant => "match.phase.postplant",
+                NetworkMatchPhase.RoundEnd => "match.phase.round_end",
+                NetworkMatchPhase.HalfTime => "match.phase.halftime",
+                NetworkMatchPhase.MatchEnd => "match.phase.match_end",
+                _ => "network.waiting"
+            };
+        }
+
+        private static string GetReasonKey(NetworkRoundEndReason reason)
+        {
+            return reason switch
+            {
+                NetworkRoundEndReason.Elimination => "match.reason.elimination",
+                NetworkRoundEndReason.TimeExpired => "match.reason.time",
+                NetworkRoundEndReason.BombExploded => "match.reason.explosion",
+                NetworkRoundEndReason.BombDefused => "match.reason.defuse",
+                _ => "match.reason.elimination"
+            };
         }
 
         private void UpdateLocalCamera(in NetworkPlayerState state, in LocalTransform transform)
