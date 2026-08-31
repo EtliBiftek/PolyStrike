@@ -45,6 +45,7 @@ spectator.mode.firstperson=Birinci Şahıs
 spectator.mode.chase=Takip Kamerası
 
 voice.transmitting=TAKIM SESİ  •  KONUŞUYORSUN
+voice.speaking=SES  •  {0}
 voice.status.starting=Takım sesi hazırlanıyor...
 voice.status.ready=Takım sesi hazır
 voice.status.unavailable=Takım sesi kullanılamıyor
