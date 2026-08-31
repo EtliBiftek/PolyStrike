@@ -125,7 +125,7 @@ namespace PolyStrike.Networking
                     VelocityModifier = 1f,
                     Health = joinAlive ? (ushort)100 : (ushort)0,
                     Armor = 0,
-                    Money = NetworkMatchRules.StartMoney,
+                    Money = (ushort)math.clamp(NetworkMatchRules.StartMoney, 0, ushort.MaxValue),
                     Kills = 0,
                     Deaths = 0,
                     PingMs = 0,
@@ -134,7 +134,7 @@ namespace PolyStrike.Networking
                     MagazineAmmo = pistolMagazine,
                     ReserveAmmo = pistolReserve,
                     Flags = joinAlive
-                        ? NetworkPlayerFlags.Alive | NetworkPlayerFlags.Grounded
+                        ? (byte)(NetworkPlayerFlags.Alive | NetworkPlayerFlags.Grounded)
                         : NetworkPlayerFlags.Grounded
                 });
                 commandBuffer.SetComponent(player, new NetworkLoadoutState
