@@ -14,12 +14,10 @@ namespace PolyStrike.Networking
 
         public override bool Initialize(string defaultWorldName)
         {
-            // Network simulation must continue when the game loses focus or runs headless.
             Application.runInBackground = true;
 
-#if UNITY_EDITOR
-            AutoConnectPort = DefaultGamePort;
-#endif
+            // Connections are created by the in-game Host/Join screen. Auto-connect would race that flow.
+            AutoConnectPort = 0;
 
             CreateDefaultClientServerWorlds();
             ConfigureServerTickRate();
@@ -50,7 +48,6 @@ namespace PolyStrike.Networking
             {
                 serverWorld.EntityManager.CreateSingleton(new LagCompensationConfig
                 {
-                    // Zero uses Netcode's full supported server history capacity.
                     ServerHistorySize = 0,
                     ClientHistorySize = 1
                 });
