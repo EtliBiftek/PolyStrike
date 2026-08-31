@@ -179,6 +179,40 @@ namespace PolyStrike.Match
             ClearPlantedBomb();
         }
 
+        public static bool TryBotPlant(MatchParticipant bot)
+        {
+            var match = MatchRoundManager.Instance;
+            if (bot == null || !bot.IsAlive || bot.Team != MatchTeam.Terrorists || !bot.CarriesBomb ||
+                match == null || match.Phase != RoundPhase.Live)
+                return false;
+
+            var site = BombSite.FindAt(bot.transform.position);
+            if (site == null)
+                return false;
+
+            var position = bot.transform.position;
+            position.y = Mathf.Max(site.PlantPosition.y + 0.05f, 0.05f);
+            SpawnPlantedBomb(position);
+            bot.GiveBomb(false);
+            match.RegisterBombPlanted(bot);
+            return true;
+        }
+
+        public static bool TryBotDefuse(MatchParticipant bot)
+        {
+            var match = MatchRoundManager.Instance;
+            if (bot == null || !bot.IsAlive || bot.Team != MatchTeam.CounterTerrorists || plantedBomb == null ||
+                match == null || match.Phase != RoundPhase.PostPlant)
+                return false;
+
+            if (Vector3.Distance(bot.transform.position, plantedBomb.transform.position) > DefuseUseDistance)
+                return false;
+
+            match.RegisterBombDefused(bot);
+            ClearPlantedBomb();
+            return true;
+        }
+
         public bool DropCarriedBomb(bool throwForward)
         {
             if (!participant.CarriesBomb || plantedBomb != null)
