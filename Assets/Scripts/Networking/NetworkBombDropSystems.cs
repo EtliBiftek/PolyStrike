@@ -22,6 +22,7 @@ namespace PolyStrike.Networking
     public struct NetworkDroppedBomb : IComponentData
     {
         public float3 Position;
+        public float PickupDelay;
     }
 
     [WorldSystemFilter(WorldSystemFilterFlags.ServerSimulation)]
@@ -31,6 +32,7 @@ namespace PolyStrike.Networking
     public partial struct NetworkBombDropSystem : ISystem
     {
         private const float PickupRadius = 1.10f;
+        private const float DropPickupDelay = 0.25f;
 
         private EntityQuery playerQuery;
         private EntityQuery droppedBombQuery;
@@ -74,7 +76,11 @@ namespace PolyStrike.Networking
                 {
                     var dropPosition = playerState.Position + new float3(0f, 0.12f, 0f);
                     var dropped = commandBuffer.CreateEntity();
-                    commandBuffer.AddComponent(dropped, new NetworkDroppedBomb { Position = dropPosition });
+                    commandBuffer.AddComponent(dropped, new NetworkDroppedBomb
+                    {
+                        Position = dropPosition,
+                        PickupDelay = DropPickupDelay
+                    });
 
                     presentation.ValueRW.DropSequence++;
                     presentation.ValueRW.DropPosition = dropPosition;
@@ -92,10 +98,10 @@ namespace PolyStrike.Networking
 
             commandBuffer.Playback(state.EntityManager);
             commandBuffer.Dispose();
-            ResolvePickups(ref state);
+            ResolvePickups(ref state, SystemAPI.Time.DeltaTime);
         }
 
-        private void ResolvePickups(ref SystemState state)
+        private void ResolvePickups(ref SystemState state, float deltaTime)
         {
             var bombs = droppedBombQuery.ToEntityArray(Allocator.Temp);
             var players = playerQuery.ToEntityArray(Allocator.Temp);
@@ -107,6 +113,13 @@ namespace PolyStrike.Networking
                     continue;
 
                 var bomb = state.EntityManager.GetComponentData<NetworkDroppedBomb>(bombEntity);
+                if (bomb.PickupDelay > 0f)
+                {
+                    bomb.PickupDelay = math.max(0f, bomb.PickupDelay - deltaTime);
+                    state.EntityManager.SetComponentData(bombEntity, bomb);
+                    continue;
+                }
+
                 var bestPlayer = Entity.Null;
                 var bestDistanceSq = PickupRadius * PickupRadius;
 
