@@ -17,7 +17,7 @@ namespace PolyStrike.Gameplay
         private const float ExitPadding = 0.01f;
         private const float FriendlyFireScale = 0.33f;
 
-        [SerializeField] private LayerMask hitMask = ~0;
+        [SerializeField] private LayerMask hitMask = Physics.DefaultRaycastLayers;
 
         private Camera shotCamera;
         private PlayerLook playerLook;
