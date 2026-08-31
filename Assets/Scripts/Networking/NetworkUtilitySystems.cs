@@ -443,6 +443,7 @@ namespace PolyStrike.Networking
         private static void DetonateHe(ref SystemState state, NativeArray<Entity> players, in NetworkGrenadeProjectile grenade)
         {
             var reward = 0;
+            var enemyKills = 0;
             for (var i = 0; i < players.Length; i++)
             {
                 var targetEntity = players[i];
@@ -462,17 +463,26 @@ namespace PolyStrike.Networking
 
                 var wasAlive = (target.Flags & NetworkPlayerFlags.Alive) != 0;
                 ApplyArmoredDamage(ref target, rawDamage, 0.60f);
-                if (wasAlive && (target.Flags & NetworkPlayerFlags.Alive) == 0 && target.Team != grenade.Team)
-                    reward += 300;
+                var killed = wasAlive && (target.Flags & NetworkPlayerFlags.Alive) == 0;
+                if (killed)
+                {
+                    target.Deaths = (ushort)math.min(ushort.MaxValue, target.Deaths + 1);
+                    if (target.Team != grenade.Team && targetEntity != grenade.Owner)
+                    {
+                        reward += 300;
+                        enemyKills++;
+                    }
+                }
 
                 state.EntityManager.SetComponentData(targetEntity, target);
             }
 
-            if (reward > 0 && state.EntityManager.Exists(grenade.Owner) &&
+            if ((reward > 0 || enemyKills > 0) && state.EntityManager.Exists(grenade.Owner) &&
                 state.EntityManager.HasComponent<NetworkPlayerState>(grenade.Owner))
             {
                 var owner = state.EntityManager.GetComponentData<NetworkPlayerState>(grenade.Owner);
                 owner.Money = (ushort)math.min(NetworkMatchRules.MaxMoney, owner.Money + reward);
+                owner.Kills = (ushort)math.min(ushort.MaxValue, owner.Kills + enemyKills);
                 state.EntityManager.SetComponentData(grenade.Owner, owner);
             }
         }
@@ -590,6 +600,17 @@ namespace PolyStrike.Networking
                         {
                             target.Flags &= unchecked((byte)~NetworkPlayerFlags.Alive);
                             target.Velocity = float3.zero;
+                            target.Deaths = (ushort)math.min(ushort.MaxValue, target.Deaths + 1);
+
+                            if (target.Team != fire.Team && targetEntity != fire.Owner &&
+                                state.EntityManager.Exists(fire.Owner) &&
+                                state.EntityManager.HasComponent<NetworkPlayerState>(fire.Owner))
+                            {
+                                var owner = state.EntityManager.GetComponentData<NetworkPlayerState>(fire.Owner);
+                                owner.Kills = (ushort)math.min(ushort.MaxValue, owner.Kills + 1);
+                                owner.Money = (ushort)math.min(NetworkMatchRules.MaxMoney, owner.Money + 300);
+                                state.EntityManager.SetComponentData(fire.Owner, owner);
+                            }
                         }
                         state.EntityManager.SetComponentData(targetEntity, target);
                     }
