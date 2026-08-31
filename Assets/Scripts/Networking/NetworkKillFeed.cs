@@ -158,37 +158,70 @@ namespace PolyStrike.Networking
             if (entries.Count == 0)
                 return;
 
-            var rowStyle = new GUIStyle(GUI.skin.box)
+            var nameStyle = new GUIStyle(GUI.skin.label)
             {
-                alignment = TextAnchor.MiddleRight,
                 fontSize = 15,
-                padding = new RectOffset(8, 8, 3, 3)
+                fontStyle = FontStyle.Bold,
+                alignment = TextAnchor.MiddleLeft
             };
-            rowStyle.normal.textColor = Color.white;
+            var markerStyle = new GUIStyle(GUI.skin.label)
+            {
+                fontSize = 13,
+                alignment = TextAnchor.MiddleCenter
+            };
+            markerStyle.normal.textColor = Color.white;
 
             var y = 52f;
             for (var i = entries.Count - 1; i >= 0; i--)
             {
-                var entry = entries[i];
-                var weapon = Localization.Get(GetWeaponKey(entry.Weapon, entry.KillerTeam));
-                var headshot = (entry.Flags & NetworkKillFeedFlags.Headshot) != 0
-                    ? "  " + Localization.Get("killfeed.headshot")
-                    : string.Empty;
-                var teamKill = (entry.Flags & NetworkKillFeedFlags.TeamKill) != 0
-                    ? "  " + Localization.Get("killfeed.teamkill")
-                    : string.Empty;
-                var suicide = (entry.Flags & NetworkKillFeedFlags.Suicide) != 0
-                    ? "  " + Localization.Get("killfeed.suicide")
-                    : string.Empty;
-                var environment = (entry.Flags & NetworkKillFeedFlags.Environment) != 0;
-
-                var text = environment
-                    ? $"{weapon}   {entry.Victim}"
-                    : $"{entry.Killer}   {weapon}{headshot}{teamKill}{suicide}   {entry.Victim}";
-                var width = Mathf.Clamp(rowStyle.CalcSize(new GUIContent(text)).x + 20f, 260f, 560f);
-                GUI.Box(new Rect(Screen.width - width - 22f, y, width, 28f), text, rowStyle);
+                DrawEntry(entries[i], nameStyle, markerStyle, y);
                 y += 31f;
             }
+        }
+
+        private static void DrawEntry(Entry entry, GUIStyle nameStyle, GUIStyle markerStyle, float y)
+        {
+            var weapon = Localization.Get(GetWeaponKey(entry.Weapon, entry.KillerTeam));
+            var headshot = (entry.Flags & NetworkKillFeedFlags.Headshot) != 0
+                ? "  " + Localization.Get("killfeed.headshot")
+                : string.Empty;
+            var teamKill = (entry.Flags & NetworkKillFeedFlags.TeamKill) != 0
+                ? "  " + Localization.Get("killfeed.teamkill")
+                : string.Empty;
+            var suicide = (entry.Flags & NetworkKillFeedFlags.Suicide) != 0
+                ? "  " + Localization.Get("killfeed.suicide")
+                : string.Empty;
+            var marker = weapon + headshot + teamKill + suicide;
+            var environment = (entry.Flags & NetworkKillFeedFlags.Environment) != 0;
+
+            var killerWidth = environment ? 0f : Mathf.Clamp(nameStyle.CalcSize(new GUIContent(entry.Killer)).x + 10f, 60f, 190f);
+            var markerWidth = Mathf.Clamp(markerStyle.CalcSize(new GUIContent(marker)).x + 12f, 80f, 210f);
+            var victimWidth = Mathf.Clamp(nameStyle.CalcSize(new GUIContent(entry.Victim)).x + 10f, 60f, 190f);
+            var width = killerWidth + markerWidth + victimWidth + 18f;
+            var x = Screen.width - width - 22f;
+
+            GUI.Box(new Rect(x, y, width, 28f), string.Empty);
+            var cursor = x + 7f;
+
+            if (!environment)
+            {
+                nameStyle.normal.textColor = TeamColor(entry.KillerTeam);
+                GUI.Label(new Rect(cursor, y + 1f, killerWidth, 26f), entry.Killer, nameStyle);
+                cursor += killerWidth;
+            }
+
+            GUI.Label(new Rect(cursor, y + 1f, markerWidth, 26f), marker, markerStyle);
+            cursor += markerWidth;
+
+            nameStyle.normal.textColor = TeamColor(entry.VictimTeam);
+            GUI.Label(new Rect(cursor, y + 1f, victimWidth, 26f), entry.Victim, nameStyle);
+        }
+
+        private static Color TeamColor(byte team)
+        {
+            return team == 0
+                ? new Color(0.90f, 0.67f, 0.34f)
+                : new Color(0.45f, 0.68f, 0.95f);
         }
 
         private static string GetWeaponKey(byte weapon, byte team)
