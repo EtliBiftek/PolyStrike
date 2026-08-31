@@ -5,7 +5,7 @@ using Unity.NetCode;
 namespace PolyStrike.Networking
 {
     [WorldSystemFilter(WorldSystemFilterFlags.ServerSimulation)]
-    [UpdateInGroup(typeof(ServerSimulationSystemGroup))]
+    [UpdateInGroup(typeof(SimulationSystemGroup))]
     public partial struct NetworkPlayerPingSystem : ISystem
     {
         public void OnUpdate(ref SystemState state)
