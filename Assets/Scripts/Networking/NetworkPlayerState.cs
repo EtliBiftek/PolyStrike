@@ -10,6 +10,7 @@ namespace PolyStrike.Networking
         [GhostField(Quantization = 1000)] public float3 Velocity;
         [GhostField(Quantization = 100)] public float Yaw;
         [GhostField(Quantization = 100)] public float Pitch;
+        [GhostField(Quantization = 1000)] public float CrouchAmount;
         [GhostField] public ushort Health;
         [GhostField] public ushort Armor;
         [GhostField] public byte Team;
