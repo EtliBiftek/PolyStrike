@@ -130,7 +130,7 @@ namespace PolyStrike.Networking
             {
                 var entity = players[i];
                 var player = state.EntityManager.GetComponentData<NetworkPlayerState>(entity);
-                player.Money = NetworkMatchRules.StartMoney;
+                player.Money = (ushort)math.clamp(NetworkMatchRules.StartMoney, 0, ushort.MaxValue);
                 ResetLoadoutForNewHalf(ref state, entity, ref player);
                 state.EntityManager.SetComponentData(entity, player);
             }
@@ -416,13 +416,20 @@ namespace PolyStrike.Networking
                 var entity = players[i];
                 var player = state.EntityManager.GetComponentData<NetworkPlayerState>(entity);
                 player.Team = (byte)(player.Team == 0 ? 1 : 0);
-                player.Money = NetworkMatchRules.StartMoney;
+                player.Money = (ushort)math.clamp(NetworkMatchRules.StartMoney, 0, ushort.MaxValue);
                 ResetLoadoutForNewHalf(ref state, entity, ref player);
                 state.EntityManager.SetComponentData(entity, player);
             }
 
-            foreach (var connection in SystemAPI.Query<RefRW<NetworkPlayerConnection>>())
-                connection.ValueRW.Team = (byte)(connection.ValueRO.Team == 0 ? 1 : 0);
+            using var connectionQuery = state.EntityManager.CreateEntityQuery(ComponentType.ReadWrite<NetworkPlayerConnection>());
+            using var connectionEntities = connectionQuery.ToEntityArray(Allocator.Temp);
+            for (var i = 0; i < connectionEntities.Length; i++)
+            {
+                var entity = connectionEntities[i];
+                var connection = state.EntityManager.GetComponentData<NetworkPlayerConnection>(entity);
+                connection.Team = (byte)(connection.Team == 0 ? 1 : 0);
+                state.EntityManager.SetComponentData(entity, connection);
+            }
         }
 
         private static void ResetLoadoutForNewHalf(ref SystemState state, Entity entity, ref NetworkPlayerState player)
@@ -494,10 +501,13 @@ namespace PolyStrike.Networking
 
         private static int FindSlotForPlayer(ref SystemState state, Entity playerEntity)
         {
-            foreach (var connection in SystemAPI.Query<RefRO<NetworkPlayerConnection>>())
+            using var connectionQuery = state.EntityManager.CreateEntityQuery(ComponentType.ReadOnly<NetworkPlayerConnection>());
+            using var connectionEntities = connectionQuery.ToEntityArray(Allocator.Temp);
+            for (var i = 0; i < connectionEntities.Length; i++)
             {
-                if (connection.ValueRO.Player == playerEntity)
-                    return connection.ValueRO.Slot;
+                var connection = state.EntityManager.GetComponentData<NetworkPlayerConnection>(connectionEntities[i]);
+                if (connection.Player == playerEntity)
+                    return connection.Slot;
             }
             return 0;
         }
