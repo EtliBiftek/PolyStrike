@@ -9,7 +9,7 @@ namespace PolyStrike.Networking
     }
 
     [WorldSystemFilter(WorldSystemFilterFlags.ServerSimulation)]
-    [UpdateInGroup(typeof(ServerSimulationSystemGroup))]
+    [UpdateInGroup(typeof(SimulationSystemGroup))]
     public partial struct ServerAdmissionSystem : ISystem
     {
         public void OnUpdate(ref SystemState state)
