@@ -11,9 +11,12 @@ namespace PolyStrike.Networking
     [DisallowMultipleComponent]
     public sealed class NetworkConnectionMenu : MonoBehaviour
     {
+        private const float ConnectionEntityGracePeriod = 1.25f;
+
         private string address = "127.0.0.1";
         private bool connectionRequested;
         private bool onlineScenePrepared;
+        private float connectionRequestedAt;
         private string statusKey = "network.status.ready";
 
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
@@ -36,6 +39,13 @@ namespace PolyStrike.Networking
 
             Cursor.lockState = CursorLockMode.None;
             Cursor.visible = true;
+
+            // A connect request is consumed before the connection entity appears, so give NetCode one short grace window.
+            if (HasClientConnectionEntity() || Time.unscaledTime - connectionRequestedAt < ConnectionEntityGracePeriod)
+                return;
+
+            connectionRequested = false;
+            statusKey = "network.status.failed";
         }
 
         private void OnGUI()
@@ -47,7 +57,7 @@ namespace PolyStrike.Networking
             Cursor.visible = true;
 
             const float width = 420f;
-            const float height = 300f;
+            const float height = 320f;
             var rect = new Rect((Screen.width - width) * 0.5f, (Screen.height - height) * 0.5f, width, height);
             GUI.Box(rect, string.Empty);
 
@@ -57,6 +67,12 @@ namespace PolyStrike.Networking
 
             if (!connectionRequested)
             {
+                if (statusKey != "network.status.ready")
+                {
+                    GUILayout.Label(Localization.Get(statusKey));
+                    GUILayout.Space(8f);
+                }
+
                 GUILayout.Label(Localization.Get("network.address"));
                 address = GUILayout.TextField(address, 64);
                 GUILayout.Space(10f);
@@ -100,8 +116,7 @@ namespace PolyStrike.Networking
             var connect = clientWorld.EntityManager.CreateEntity(typeof(NetworkStreamRequestConnect));
             clientWorld.EntityManager.SetComponentData(connect, new NetworkStreamRequestConnect { Endpoint = localEndpoint });
 
-            connectionRequested = true;
-            statusKey = "network.status.hosting";
+            BeginConnectionAttempt("network.status.hosting");
         }
 
         private void Join(string host)
@@ -136,8 +151,14 @@ namespace PolyStrike.Networking
             PrepareOnlineScene();
             var connect = clientWorld.EntityManager.CreateEntity(typeof(NetworkStreamRequestConnect));
             clientWorld.EntityManager.SetComponentData(connect, new NetworkStreamRequestConnect { Endpoint = endpoint });
+            BeginConnectionAttempt("network.status.connecting");
+        }
+
+        private void BeginConnectionAttempt(string nextStatusKey)
+        {
             connectionRequested = true;
-            statusKey = "network.status.connecting";
+            connectionRequestedAt = Time.unscaledTime;
+            statusKey = nextStatusKey;
         }
 
         private void PrepareOnlineScene()
@@ -176,6 +197,18 @@ namespace PolyStrike.Networking
             var connected = query.CalculateEntityCount() > 0;
             query.Dispose();
             return connected;
+        }
+
+        private static bool HasClientConnectionEntity()
+        {
+            var clientWorld = ClientServerBootstrap.ClientWorld;
+            if (!IsUsable(clientWorld))
+                return false;
+
+            var query = clientWorld.EntityManager.CreateEntityQuery(typeof(NetworkStreamConnection));
+            var exists = query.CalculateEntityCount() > 0;
+            query.Dispose();
+            return exists;
         }
 
         private static bool IsUsable(World world) => world != null && world.IsCreated;
