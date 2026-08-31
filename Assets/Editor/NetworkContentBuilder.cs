@@ -5,6 +5,7 @@ using Unity.Scenes;
 using UnityEditor;
 using UnityEditor.SceneManagement;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace PolyStrike.Editor
 {
@@ -59,10 +60,10 @@ namespace PolyStrike.Editor
                 if (!scene.IsValid() || !scene.isLoaded)
                     throw new System.InvalidOperationException("Network subscene oluşturulamadı.");
 
-                if (!EditorSceneManager.SetActiveScene(scene))
-                    throw new System.InvalidOperationException("Network subscene aktif sahne yapılamadı.");
-
                 var setupObject = new GameObject("Network Game Setup");
+                if (setupObject.scene != scene)
+                    SceneManager.MoveGameObjectToScene(setupObject, scene);
+
                 var setup = setupObject.AddComponent<NetworkGameSetupAuthoring>();
                 setup.PlayerGhostPrefab = playerGhostPrefab;
 
@@ -74,7 +75,7 @@ namespace PolyStrike.Editor
                 if (scene.IsValid() && scene.isLoaded)
                     EditorSceneManager.CloseScene(scene, true);
 
-                if (previousScene.IsValid() && previousScene.isLoaded)
+                if (previousScene.IsValid() && previousScene.isLoaded && EditorSceneManager.GetActiveScene() != previousScene)
                     EditorSceneManager.SetActiveScene(previousScene);
             }
 

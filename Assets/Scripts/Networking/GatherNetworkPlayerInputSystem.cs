@@ -66,50 +66,48 @@ namespace PolyStrike.Networking
             var currentYaw = yaw;
             var currentPitch = pitch;
 
-            Entities
-                .WithAll<GhostOwnerIsLocal>()
-                .ForEach((ref NetworkPlayerInput input) =>
+            foreach (var inputRef in SystemAPI.Query<RefRW<NetworkPlayerInput>>().WithAll<GhostOwnerIsLocal>())
+            {
+                ref var input = ref inputRef.ValueRW;
+                input.Move = new float2(move.x, move.y);
+                input.Look = new float2(currentYaw, currentPitch);
+                input.CrouchHeld = crouch;
+                input.WalkHeld = walk;
+                input.FireHeld = fire;
+                input.SecondaryFireHeld = secondaryFire;
+                input.UseHeld = use;
+                input.WeaponSlot = slot;
+
+                if (jump)
                 {
-                    input.Move = new float2(move.x, move.y);
-                    input.Look = new float2(currentYaw, currentPitch);
-                    input.CrouchHeld = crouch;
-                    input.WalkHeld = walk;
-                    input.FireHeld = fire;
-                    input.SecondaryFireHeld = secondaryFire;
-                    input.UseHeld = use;
-                    input.WeaponSlot = slot;
+                    input.Jump.Set();
+                    input.JumpSubtick = subtick;
+                }
 
-                    if (jump)
-                    {
-                        input.Jump.Set();
-                        input.JumpSubtick = subtick;
-                    }
+                if (firePressed)
+                {
+                    input.FirePressed.Set();
+                    input.FireSubtick = subtick;
+                }
 
-                    if (firePressed)
-                    {
-                        input.FirePressed.Set();
-                        input.FireSubtick = subtick;
-                    }
+                if (fireReleased)
+                    input.FireReleased.Set();
 
-                    if (fireReleased)
-                        input.FireReleased.Set();
+                if (secondaryPressed)
+                {
+                    input.SecondaryFirePressed.Set();
+                    input.SecondaryFireSubtick = subtick;
+                }
 
-                    if (secondaryPressed)
-                    {
-                        input.SecondaryFirePressed.Set();
-                        input.SecondaryFireSubtick = subtick;
-                    }
+                if (secondaryReleased)
+                    input.SecondaryFireReleased.Set();
 
-                    if (secondaryReleased)
-                        input.SecondaryFireReleased.Set();
+                if (reload)
+                    input.Reload.Set();
 
-                    if (reload)
-                        input.Reload.Set();
-
-                    if (drop)
-                        input.Drop.Set();
-                })
-                .Run();
+                if (drop)
+                    input.Drop.Set();
+            }
         }
 
         private static byte QuantizeSubtick(float fraction)
