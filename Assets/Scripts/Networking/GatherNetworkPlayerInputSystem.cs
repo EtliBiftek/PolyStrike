@@ -9,7 +9,7 @@ namespace PolyStrike.Networking
     [UpdateInGroup(typeof(GhostInputSystemGroup))]
     public partial class GatherNetworkPlayerInputSystem : SystemBase
     {
-        private const float LookSensitivity = 0.085f;
+        private const float BaseLookSensitivity = 0.085f;
 
         private EntityQuery localPlayerQuery;
         private float yaw;
@@ -43,7 +43,7 @@ namespace PolyStrike.Networking
             }
 
             var move = GameInput.Movement;
-            var lookDelta = GameInput.MouseDelta * LookSensitivity;
+            var lookDelta = GameInput.MouseDelta * (BaseLookSensitivity * CompetitiveCvars.Sensitivity);
             yaw = WrapAngle(yaw + lookDelta.x);
             pitch = math.clamp(pitch - lookDelta.y, -89f, 89f);
 
