@@ -565,7 +565,7 @@ namespace PolyStrike.Networking
 
                 if (Automatic)
                 {
-                    var i = math.min(index, (byte)29);
+                    var i = math.min((int)index, 29);
                     var vertical = math.min(i * (TeamPatternScale() ? 0.43f : 0.36f), TeamPatternScale() ? 10.9f : 8.9f);
                     var phase = i < 9 ? 0f : (i - 9) * 0.55f;
                     var horizontal = i < 9 ? math.sin(i * 1.8f) * 0.1f : math.sin(phase) * (TeamPatternScale() ? 3.8f : 3.1f);
