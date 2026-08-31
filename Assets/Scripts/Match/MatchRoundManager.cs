@@ -16,6 +16,7 @@ namespace PolyStrike.Match
         private int roundsPlayed;
         private float phaseEndsAt;
         private float buyEndsAt;
+        private float restartAt = -1f;
         private bool bombWasPlantedThisRound;
 
         public RoundPhase Phase { get; private set; } = RoundPhase.FreezeTime;
@@ -39,9 +40,9 @@ namespace PolyStrike.Match
 
         private void Start()
         {
-            participants.AddRange(MatchParticipant.All);
-            for (var i = 0; i < participants.Count; i++)
-                participants[i].Died += OnParticipantDied;
+            var existing = MatchParticipant.All;
+            for (var i = 0; i < existing.Count; i++)
+                RegisterParticipant(existing[i]);
 
             BeginFirstHalf();
         }
@@ -60,6 +61,13 @@ namespace PolyStrike.Match
 
         private void Update()
         {
+            if (restartAt >= 0f && Time.time >= restartAt)
+            {
+                restartAt = -1f;
+                RestartMatchNow();
+                return;
+            }
+
             switch (Phase)
             {
                 case RoundPhase.FreezeTime:
@@ -87,6 +95,28 @@ namespace PolyStrike.Match
                         StartNextHalfRound();
                     break;
             }
+        }
+
+        public void RegisterParticipant(MatchParticipant participant)
+        {
+            if (participant == null || participants.Contains(participant))
+                return;
+
+            participants.Add(participant);
+            participant.Died += OnParticipantDied;
+        }
+
+        public void UnregisterParticipant(MatchParticipant participant)
+        {
+            if (participant == null || !participants.Remove(participant))
+                return;
+
+            participant.Died -= OnParticipantDied;
+        }
+
+        public void RequestRestart(float delaySeconds)
+        {
+            restartAt = Time.time + Mathf.Max(0f, delaySeconds);
         }
 
         public void RegisterBombPlanted(MatchParticipant plantedBy)
@@ -145,6 +175,33 @@ namespace PolyStrike.Match
             return count;
         }
 
+        private void RestartMatchNow()
+        {
+            TerroristScore = 0;
+            CounterTerroristScore = 0;
+            roundsPlayed = 0;
+            MatchWinner = null;
+            MatchDrawn = false;
+            LastRoundWinner = null;
+            LastRoundEndReason = null;
+            tLossLevel = MatchRules.StartingLossLevel;
+            ctLossLevel = MatchRules.StartingLossLevel;
+
+            for (var i = participants.Count - 1; i >= 0; i--)
+            {
+                var participant = participants[i];
+                if (participant == null)
+                {
+                    participants.RemoveAt(i);
+                    continue;
+                }
+
+                participant.BeginHalf(participant.Team);
+            }
+
+            StartFreezeTime();
+        }
+
         private void BeginFirstHalf()
         {
             tLossLevel = MatchRules.StartingLossLevel;
@@ -163,7 +220,10 @@ namespace PolyStrike.Match
             LastRoundWinner = null;
 
             for (var i = 0; i < participants.Count; i++)
-                participants[i].PrepareRound();
+            {
+                if (participants[i] != null)
+                    participants[i].PrepareRound();
+            }
 
             AssignBombCarrier();
             ClearRoundWorldEffects();
@@ -217,6 +277,9 @@ namespace PolyStrike.Match
             for (var i = 0; i < participants.Count; i++)
             {
                 var participant = participants[i];
+                if (participant == null)
+                    continue;
+
                 if (participant.Team == winner)
                     participant.AddMoney(winnerReward);
                 else
@@ -227,7 +290,7 @@ namespace PolyStrike.Match
             {
                 for (var i = 0; i < participants.Count; i++)
                 {
-                    if (participants[i].Team == MatchTeam.Terrorists)
+                    if (participants[i] != null && participants[i].Team == MatchTeam.Terrorists)
                         participants[i].AddMoney(MatchRules.PlantedButDefusedTeamReward);
                 }
             }
@@ -279,6 +342,9 @@ namespace PolyStrike.Match
             for (var i = 0; i < participants.Count; i++)
             {
                 var participant = participants[i];
+                if (participant == null)
+                    continue;
+
                 var swapped = participant.Team == MatchTeam.Terrorists
                     ? MatchTeam.CounterTerrorists
                     : MatchTeam.Terrorists;
@@ -319,6 +385,9 @@ namespace PolyStrike.Match
             for (var i = 0; i < participants.Count; i++)
             {
                 var participant = participants[i];
+                if (participant == null)
+                    continue;
+
                 participant.GiveBomb(false);
                 if (carrier == null && participant.Team == MatchTeam.Terrorists && participant.IsAlive)
                     carrier = participant;
