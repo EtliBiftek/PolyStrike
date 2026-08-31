@@ -15,6 +15,8 @@ namespace PolyStrike.Networking
         [GhostField] public ushort Health;
         [GhostField] public ushort Armor;
         [GhostField] public ushort Money;
+        [GhostField] public ushort Kills;
+        [GhostField] public ushort Deaths;
         [GhostField] public byte Team;
         [GhostField] public byte ActiveWeapon;
         [GhostField] public byte MagazineAmmo;
