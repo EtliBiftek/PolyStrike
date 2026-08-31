@@ -147,6 +147,27 @@ namespace PolyStrike.Player
             return inventory[(int)type];
         }
 
+        public bool TryBotThrowAt(GrenadeType type, Vector3 targetPosition, float strength = 1f)
+        {
+            var index = (int)type;
+            if (index < 0 || index >= inventory.Length || inventory[index] <= 0 || throwPending)
+                return false;
+
+            var origin = transform.position + Vector3.up * 1.55f;
+            if (!TrySolveBotLaunch(origin, targetPosition, Mathf.Clamp01(strength), out var velocityMeters))
+                return false;
+
+            var inherited = movement != null ? movement.WorldVelocity * GrenadeRules.PlayerVelocityInheritance : Vector3.zero;
+            velocityMeters += inherited;
+
+            var direction = velocityMeters.sqrMagnitude > 0.0001f ? velocityMeters.normalized : transform.forward;
+            var spawn = ResolveSpawnPoint(origin, direction, SourceUnit.ToMeters(22f)) - direction * SourceUnit.ToMeters(6f);
+            SpawnProjectile(type, spawn, SourceUnit.ToSourceUnits(velocityMeters));
+            ConsumeOne(type);
+            handlingSource?.PlayOneShot(UtilitySfxBank.Throw(type), 0.66f);
+            return true;
+        }
+
         public void ResetForHalf()
         {
             ClearInventory();
@@ -331,6 +352,31 @@ namespace PolyStrike.Player
             var launchVelocity = direction * GrenadeRules.GetThrowSpeed(strength) + inheritedVelocity;
 
             return new LaunchState(spawn, launchVelocity);
+        }
+
+        private static bool TrySolveBotLaunch(Vector3 origin, Vector3 target, float strength, out Vector3 velocityMeters)
+        {
+            velocityMeters = Vector3.zero;
+            var delta = target - origin;
+            var flat = new Vector3(delta.x, 0f, delta.z);
+            var horizontalDistance = flat.magnitude;
+            if (horizontalDistance < 0.15f)
+                return false;
+
+            var speed = SourceUnit.ToMeters(GrenadeRules.GetThrowSpeed(strength));
+            var gravity = SourceUnit.ToMeters(GrenadeRules.Gravity);
+            var speedSquared = speed * speed;
+            var discriminant = speedSquared * speedSquared - gravity *
+                (gravity * horizontalDistance * horizontalDistance + 2f * delta.y * speedSquared);
+
+            if (discriminant < 0f)
+                return false;
+
+            var tangent = (speedSquared - Mathf.Sqrt(discriminant)) / (gravity * horizontalDistance);
+            var angle = Mathf.Atan(tangent);
+            var flatDirection = flat / horizontalDistance;
+            velocityMeters = flatDirection * (Mathf.Cos(angle) * speed) + Vector3.up * (Mathf.Sin(angle) * speed);
+            return true;
         }
 
         private Vector3 ResolveSpawnPoint(Vector3 origin, Vector3 direction, float maxDistance)
