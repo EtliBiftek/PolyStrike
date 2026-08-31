@@ -8,6 +8,7 @@
     "com.unity.physics": "1.4.3",
     "com.unity.services.authentication": "3.7.1",
     "com.unity.services.vivox": "16.11.0",
-    "com.unity.transport": "2.6.0"
+    "com.unity.transport": "2.6.0",
+    "com.unity.modules.particlesystem": "1.0.0"
   }
 }
