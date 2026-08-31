@@ -233,7 +233,7 @@ namespace PolyStrike.Networking
 
                 var input = state.EntityManager.GetComponentData<NetworkPlayerInput>(entity);
                 var interaction = state.EntityManager.GetComponentData<NetworkInteractionState>(entity);
-                var site = FindBombSite(player.Position);
+                var site = NetworkSandlineCollision.FindBombSite(player.Position);
                 var grounded = (player.Flags & NetworkPlayerFlags.Grounded) != 0;
                 var holdingPlant = player.ActiveWeapon == 5 && (input.FireHeld != 0 || input.UseHeld != 0);
 
@@ -479,8 +479,7 @@ namespace PolyStrike.Networking
         private static void MoveToTeamSpawn(ref SystemState state, Entity entity, ref NetworkPlayerState player)
         {
             var slot = FindSlotForPlayer(ref state, entity);
-            var x = -1.6f + math.clamp(slot, 0, 4) * 0.8f;
-            player.Position = new float3(x, NetworkSandlineCollision.GroundY, player.Team == 0 ? -24f : 24f);
+            player.Position = NetworkSandlineCollision.GetSpawn(player.Team, slot);
             player.Yaw = player.Team == 0 ? 0f : 180f;
             player.Pitch = 0f;
 
@@ -513,15 +512,6 @@ namespace PolyStrike.Networking
                     count++;
             }
             return count;
-        }
-
-        private static byte FindBombSite(float3 position)
-        {
-            if (math.abs(position.x - 17f) <= 3.75f && math.abs(position.z - 14.5f) <= 3.5f)
-                return 0;
-            if (math.abs(position.x + 16.5f) <= 3.5f && math.abs(position.z - 15f) <= 3.5f)
-                return 1;
-            return byte.MaxValue;
         }
 
         private static void ApplyBombDamage(ref SystemState state, NativeArray<Entity> players, in NetworkMatchRuntime runtime)
