@@ -23,7 +23,11 @@ namespace PolyStrike.Networking
                 commandBuffer.AddComponent<ClientJoinRequestSent>(entity);
 
                 var rpc = commandBuffer.CreateEntity();
-                commandBuffer.AddComponent<NetworkJoinRequest>(rpc);
+                var playerName = NetworkConnectionMenu.LocalPlayerName;
+                commandBuffer.AddComponent(rpc, new NetworkJoinRequest
+                {
+                    PlayerName = new FixedString128Bytes(playerName)
+                });
                 commandBuffer.AddComponent(rpc, new SendRpcCommandRequest { TargetConnection = entity });
             }
 
