@@ -65,6 +65,13 @@ namespace PolyStrike.Networking
                     continue;
                 }
 
+                if (join.ValueRO.PlayerName.IsEmpty)
+                {
+                    commandBuffer.AddComponent<NetworkStreamRequestDisconnect>(connection);
+                    commandBuffer.DestroyEntity(rpcEntity);
+                    continue;
+                }
+
                 var useTerrorists = terroristCount < 5 && (terroristCount <= counterTerroristCount || counterTerroristCount >= 5);
                 if (!useTerrorists && counterTerroristCount >= 5)
                 {
@@ -92,13 +99,10 @@ namespace PolyStrike.Networking
 
                 var pistolMagazine = team == 0 ? (byte)20 : (byte)12;
                 var pistolReserve = team == 0 ? (byte)120 : (byte)24;
-                var playerName = join.ValueRO.PlayerName;
-                if (playerName.IsEmpty)
-                    playerName = new FixedString128Bytes($"Player {networkId}");
 
                 commandBuffer.SetComponent(player, new NetworkPlayerState
                 {
-                    PlayerName = playerName,
+                    PlayerName = join.ValueRO.PlayerName,
                     Position = position,
                     Velocity = float3.zero,
                     Yaw = yaw,
