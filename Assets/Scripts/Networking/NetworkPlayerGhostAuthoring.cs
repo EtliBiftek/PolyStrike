@@ -55,6 +55,8 @@ namespace PolyStrike.Networking
                 AddComponent<NetworkUtilityRuntime>(entity);
                 AddComponent<NetworkUtilityPresentationState>(entity);
                 AddComponent<NetworkFlashState>(entity);
+                AddComponent(entity, new NetworkBombDropRuntime { WasAlive = 1 });
+                AddComponent<NetworkBombPresentationState>(entity);
                 AddBuffer<NetworkPlayerPoseHistory>(entity);
             }
         }
