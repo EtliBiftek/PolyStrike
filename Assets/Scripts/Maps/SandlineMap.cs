@@ -1,62 +1,47 @@
 using PolyStrike.Gameplay;
 using PolyStrike.Match;
 using Unity.AI.Navigation;
+using Unity.Mathematics;
 using UnityEngine;
 using UnityEngine.AI;
 
 namespace PolyStrike.Maps
 {
-    /// <summary>
-    /// Sandline keeps the classic three-lane desert-map rhythm without copying another map's geometry.
-    /// The important part here is timing: long sightline, contested mid, short connector and a tighter tunnel route.
-    /// </summary>
     public static class SandlineMap
     {
-        public static readonly Vector3[] TSpawns =
-        {
-            new Vector3(-1.6f, 0.05f, -24.0f),
-            new Vector3(-0.8f, 0.05f, -24.0f),
-            new Vector3(0.0f, 0.05f, -24.0f),
-            new Vector3(0.8f, 0.05f, -24.0f),
-            new Vector3(1.6f, 0.05f, -24.0f)
-        };
+        public static readonly Vector3[] TSpawns = ConvertSpawns(SandlineLayout.TSpawns);
+        public static readonly Vector3[] CTSpawns = ConvertSpawns(SandlineLayout.CTSpawns);
 
-        public static readonly Vector3[] CTSpawns =
-        {
-            new Vector3(-1.6f, 0.05f, 24.0f),
-            new Vector3(-0.8f, 0.05f, 24.0f),
-            new Vector3(0.0f, 0.05f, 24.0f),
-            new Vector3(0.8f, 0.05f, 24.0f),
-            new Vector3(1.6f, 0.05f, 24.0f)
-        };
+        public static Vector3 ASiteCenter => ToVector3(SandlineLayout.ASiteCenter);
+        public static Vector3 BSiteCenter => ToVector3(SandlineLayout.BSiteCenter);
+        public static Vector3 MidControl => ToVector3(SandlineLayout.MidControl);
+        public static Vector3 LongControl => ToVector3(SandlineLayout.LongControl);
+        public static Vector3 ShortControl => ToVector3(SandlineLayout.ShortControl);
+        public static Vector3 TunnelControl => ToVector3(SandlineLayout.TunnelControl);
+        public static Vector3 MidDoors => ToVector3(SandlineLayout.MidDoors);
+        public static Vector3 CtMid => ToVector3(SandlineLayout.CtMid);
+        public static Vector3 ALongEntry => ToVector3(SandlineLayout.ALongEntry);
+        public static Vector3 AShortEntry => ToVector3(SandlineLayout.AShortEntry);
+        public static Vector3 BTunnelEntry => ToVector3(SandlineLayout.BTunnelEntry);
+        public static Vector3 BMidEntry => ToVector3(SandlineLayout.BMidEntry);
 
-        public static readonly Vector3 ASiteCenter = new Vector3(17.0f, 0.08f, 14.5f);
-        public static readonly Vector3 BSiteCenter = new Vector3(-16.5f, 0.08f, 15.0f);
-        public static readonly Vector3 MidControl = new Vector3(0.0f, 0.05f, 5.0f);
-        public static readonly Vector3 LongControl = new Vector3(16.0f, 0.05f, 0.0f);
-        public static readonly Vector3 ShortControl = new Vector3(6.0f, 0.05f, 9.0f);
-        public static readonly Vector3 TunnelControl = new Vector3(-16.0f, 0.05f, 2.0f);
-
-        private static readonly Color Sand = new Color(0.58f, 0.48f, 0.34f);
-        private static readonly Color SandDark = new Color(0.38f, 0.31f, 0.23f);
-        private static readonly Color Stone = new Color(0.47f, 0.43f, 0.37f);
-        private static readonly Color Wood = new Color(0.34f, 0.22f, 0.12f);
+        private static readonly Color Sand = new Color(0.64f, 0.53f, 0.37f);
+        private static readonly Color SandDark = new Color(0.39f, 0.32f, 0.24f);
+        private static readonly Color Stone = new Color(0.50f, 0.46f, 0.39f);
+        private static readonly Color Wood = new Color(0.36f, 0.23f, 0.12f);
 
         public static GameObject Build()
         {
             var root = new GameObject("Sandline");
-
             CreateFloor(root.transform);
-            CreatePerimeter(root.transform);
-            CreateLaneGeometry(root.transform);
+            CreateSolidGeometry(root.transform);
             CreateSites(root.transform);
-            CreateCover(root.transform);
+            CreateVisualLandmarks(root.transform);
 
             var surface = root.AddComponent<NavMeshSurface>();
             surface.collectObjects = CollectObjects.Children;
             surface.useGeometry = NavMeshCollectGeometry.PhysicsColliders;
             surface.BuildNavMesh();
-
             return root;
         }
 
@@ -64,19 +49,23 @@ namespace PolyStrike.Maps
         {
             if (attackA)
             {
-                return slot % 3 switch
+                return slot switch
                 {
                     0 => LongControl,
-                    1 => ShortControl,
-                    _ => MidControl
+                    1 => ALongEntry,
+                    2 => ShortControl,
+                    3 => MidControl,
+                    _ => AShortEntry
                 };
             }
 
-            return slot % 3 switch
+            return slot switch
             {
                 0 => TunnelControl,
-                1 => MidControl,
-                _ => new Vector3(-8f, 0.05f, 8f)
+                1 => BTunnelEntry,
+                2 => MidControl,
+                3 => BMidEntry,
+                _ => TunnelControl + new Vector3(2.4f, 0f, 3.4f)
             };
         }
 
@@ -84,11 +73,35 @@ namespace PolyStrike.Maps
         {
             return slot switch
             {
-                0 => ASiteCenter + new Vector3(2.0f, 0f, 1.5f),
-                1 => ASiteCenter + new Vector3(-2.2f, 0f, -1.5f),
-                2 => MidControl + new Vector3(0f, 0f, 6f),
-                3 => BSiteCenter + new Vector3(2.0f, 0f, -1.3f),
-                _ => BSiteCenter + new Vector3(-2.0f, 0f, 1.2f)
+                0 => ASiteCenter + new Vector3(2.5f, 0f, 1.7f),
+                1 => AShortEntry + new Vector3(1.2f, 0f, 2.0f),
+                2 => CtMid,
+                3 => BMidEntry + new Vector3(-1.3f, 0f, 2.0f),
+                _ => BSiteCenter + new Vector3(-2.3f, 0f, 1.5f)
+            };
+        }
+
+        public static Vector3 GetPostPlantGoal(bool siteA, int slot)
+        {
+            if (siteA)
+            {
+                return slot switch
+                {
+                    0 => ALongEntry + new Vector3(1.8f, 0f, -1.6f),
+                    1 => ASiteCenter + new Vector3(3.2f, 0f, -1.6f),
+                    2 => AShortEntry + new Vector3(-1.4f, 0f, -0.5f),
+                    3 => CtMid + new Vector3(5.8f, 0f, -1.8f),
+                    _ => ASiteCenter + new Vector3(-2.8f, 0f, 2.4f)
+                };
+            }
+
+            return slot switch
+            {
+                0 => BTunnelEntry + new Vector3(-1.6f, 0f, -1.4f),
+                1 => BSiteCenter + new Vector3(-3.0f, 0f, -1.4f),
+                2 => BMidEntry + new Vector3(1.2f, 0f, -0.8f),
+                3 => CtMid + new Vector3(-5.6f, 0f, -1.5f),
+                _ => BSiteCenter + new Vector3(2.6f, 0f, 2.3f)
             };
         }
 
@@ -97,56 +110,68 @@ namespace PolyStrike.Maps
             var floor = GameObject.CreatePrimitive(PrimitiveType.Plane);
             floor.name = "Sandline Ground";
             floor.transform.SetParent(root, false);
-            floor.transform.localScale = new Vector3(6f, 1f, 6f);
+            floor.transform.localScale = new Vector3(7.4f, 1f, 7.4f);
             ConfigureSurface(floor, SurfaceMaterial.Concrete, Sand);
         }
 
-        private static void CreatePerimeter(Transform root)
+        private static void CreateSolidGeometry(Transform root)
         {
-            CreateBlock(root, "North Boundary", new Vector3(0f, 1.5f, 29.5f), new Vector3(60f, 3f, 1f), Stone);
-            CreateBlock(root, "South Boundary", new Vector3(0f, 1.5f, -29.5f), new Vector3(60f, 3f, 1f), Stone);
-            CreateBlock(root, "West Boundary", new Vector3(-29.5f, 1.5f, 0f), new Vector3(1f, 3f, 60f), Stone);
-            CreateBlock(root, "East Boundary", new Vector3(29.5f, 1.5f, 0f), new Vector3(1f, 3f, 60f), Stone);
-        }
+            for (var i = 0; i < SandlineLayout.SolidBlocks.Length; i++)
+            {
+                var block = SandlineLayout.SolidBlocks[i];
+                var surface = block.Surface == SandlineSurface.Wood ? SurfaceMaterial.Wood : SurfaceMaterial.Concrete;
+                var color = block.Surface == SandlineSurface.Wood
+                    ? Wood
+                    : PickStoneColor(block.Center, block.Size);
 
-        private static void CreateLaneGeometry(Transform root)
-        {
-            // East lane: long route with a deliberate short/connector opening near A.
-            CreateBlock(root, "East Divider South", new Vector3(8.2f, 1.5f, -8f), new Vector3(1f, 3f, 20f), SandDark);
-            CreateBlock(root, "East Divider North", new Vector3(8.2f, 1.5f, 17f), new Vector3(1f, 3f, 12f), SandDark);
-            CreateBlock(root, "Long Outer Building", new Vector3(24f, 1.7f, 2f), new Vector3(4f, 3.4f, 32f), SandDark);
-
-            // West lane: a tighter route that forces two turns before B.
-            CreateBlock(root, "West Divider South", new Vector3(-8.5f, 1.5f, -7f), new Vector3(1f, 3f, 22f), SandDark);
-            CreateBlock(root, "West Divider North", new Vector3(-8.5f, 1.5f, 18f), new Vector3(1f, 3f, 10f), SandDark);
-            CreateBlock(root, "Tunnel Outer Building", new Vector3(-24f, 1.7f, 2f), new Vector3(4f, 3.4f, 31f), SandDark);
-            CreateBlock(root, "Tunnel Bend", new Vector3(-16f, 1.5f, 7.5f), new Vector3(8f, 3f, 1f), SandDark);
-
-            // Mid has a narrow early duel and then fans out into both sites.
-            CreateBlock(root, "Mid Gate Left", new Vector3(-4.8f, 1.5f, 8f), new Vector3(7.4f, 3f, 1f), Stone);
-            CreateBlock(root, "Mid Gate Right", new Vector3(4.8f, 1.5f, 8f), new Vector3(7.4f, 3f, 1f), Stone);
-            CreateBlock(root, "T Mid Left", new Vector3(-4.5f, 1.5f, -12f), new Vector3(8f, 3f, 1f), SandDark);
-            CreateBlock(root, "T Mid Right", new Vector3(4.5f, 1.5f, -12f), new Vector3(8f, 3f, 1f), SandDark);
-
-            // Low-poly arches are represented by two solid pillars; the open center remains playable.
-            CreateBlock(root, "Mid Arch Left", new Vector3(-1.8f, 1.5f, 13f), new Vector3(1.4f, 3f, 1.2f), Stone);
-            CreateBlock(root, "Mid Arch Right", new Vector3(1.8f, 1.5f, 13f), new Vector3(1.4f, 3f, 1.2f), Stone);
+                CreateBlock(
+                    root,
+                    $"Sandline Geometry {i + 1}",
+                    ToVector3(block.Center),
+                    ToVector3(block.Size),
+                    color,
+                    surface);
+            }
         }
 
         private static void CreateSites(Transform root)
         {
-            CreateSite(root, "A", ASiteCenter, new Vector3(7.5f, 0.12f, 7.0f), new Color(0.52f, 0.28f, 0.08f));
-            CreateSite(root, "B", BSiteCenter, new Vector3(7.0f, 0.12f, 7.0f), new Color(0.16f, 0.30f, 0.50f));
+            CreateSite(root, "A", ASiteCenter, new Vector3(
+                SandlineLayout.ASiteHalfExtents.x * 2f,
+                0.12f,
+                SandlineLayout.ASiteHalfExtents.y * 2f), new Color(0.55f, 0.30f, 0.08f));
+
+            CreateSite(root, "B", BSiteCenter, new Vector3(
+                SandlineLayout.BSiteHalfExtents.x * 2f,
+                0.12f,
+                SandlineLayout.BSiteHalfExtents.y * 2f), new Color(0.16f, 0.32f, 0.52f));
         }
 
-        private static void CreateCover(Transform root)
+        private static void CreateVisualLandmarks(Transform root)
         {
-            CreateBlock(root, "A Triple", ASiteCenter + new Vector3(1.7f, 0.65f, 0.4f), new Vector3(1.4f, 1.3f, 1.4f), Wood, SurfaceMaterial.Wood);
-            CreateBlock(root, "A Ramp Cover", ASiteCenter + new Vector3(-2.4f, 0.55f, 2.1f), new Vector3(1.2f, 1.1f, 2.0f), Stone);
-            CreateBlock(root, "B Double", BSiteCenter + new Vector3(-1.5f, 0.65f, 0.5f), new Vector3(2.2f, 1.3f, 1.2f), Wood, SurfaceMaterial.Wood);
-            CreateBlock(root, "B Platform Cover", BSiteCenter + new Vector3(2.0f, 0.55f, -1.8f), new Vector3(1.2f, 1.1f, 2.0f), Stone);
-            CreateBlock(root, "Mid Box", new Vector3(2.4f, 0.55f, 2.5f), new Vector3(1.2f, 1.1f, 1.2f), Wood, SurfaceMaterial.Wood);
-            CreateBlock(root, "Long Corner", new Vector3(13f, 0.65f, -5f), new Vector3(1.4f, 1.3f, 1.4f), Stone);
+            CreateNonSolidMarker(root, new Vector3(26.0f, 3.25f, 17.5f), new Vector3(0.18f, 3.5f, 4.8f), new Color(0.46f, 0.20f, 0.08f));
+            CreateNonSolidMarker(root, new Vector3(-26.0f, 3.0f, 17.5f), new Vector3(0.18f, 3.1f, 4.8f), new Color(0.10f, 0.24f, 0.38f));
+            CreateNonSolidMarker(root, new Vector3(0f, 3.2f, 15.0f), new Vector3(4.8f, 0.12f, 0.20f), new Color(0.62f, 0.55f, 0.43f));
+        }
+
+        private static void CreateNonSolidMarker(Transform root, Vector3 position, Vector3 scale, Color color)
+        {
+            var marker = GameObject.CreatePrimitive(PrimitiveType.Cube);
+            marker.name = "Sandline Landmark";
+            marker.transform.SetParent(root, false);
+            marker.transform.position = position;
+            marker.transform.localScale = scale;
+            var collider = marker.GetComponent<Collider>();
+            if (collider != null)
+                Object.Destroy(collider);
+            SetColor(marker.GetComponent<Renderer>(), color);
+        }
+
+        private static Color PickStoneColor(float3 center, float3 size)
+        {
+            if (size.y <= 1.5f)
+                return center.x < 0f ? Stone * 0.92f : Stone;
+            return math.abs(center.x) > 20f ? SandDark : Stone;
         }
 
         private static void CreateSite(Transform root, string id, Vector3 position, Vector3 scale, Color color)
@@ -166,7 +191,7 @@ namespace PolyStrike.Maps
             Vector3 position,
             Vector3 scale,
             Color color,
-            SurfaceMaterial surfaceMaterial = SurfaceMaterial.Concrete)
+            SurfaceMaterial surfaceMaterial)
         {
             var block = GameObject.CreatePrimitive(PrimitiveType.Cube);
             block.name = name;
@@ -193,5 +218,15 @@ namespace PolyStrike.Maps
             else
                 material.color = color;
         }
+
+        private static Vector3[] ConvertSpawns(float3[] source)
+        {
+            var result = new Vector3[source.Length];
+            for (var i = 0; i < source.Length; i++)
+                result[i] = ToVector3(source[i]);
+            return result;
+        }
+
+        private static Vector3 ToVector3(float3 value) => new Vector3(value.x, value.y, value.z);
     }
 }
