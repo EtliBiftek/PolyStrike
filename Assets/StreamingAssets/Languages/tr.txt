@@ -35,7 +35,20 @@ scoreboard.alive=Hayatta
 scoreboard.dead=Ölü
 scoreboard.kills=Öldürme
 scoreboard.deaths=Ölüm
+scoreboard.ping=Ping
 scoreboard.status=Durum
+
+spectator.watching=İzleniyor: {0}
+spectator.no_teammates=İzlenecek hayatta takım arkadaşı yok
+spectator.controls=Mouse1/Mouse2: Oyuncu değiştir | Space: Kamera modu
+spectator.mode.firstperson=Birinci Şahıs
+spectator.mode.chase=Takip Kamerası
+
+killfeed.headshot=KAFADAN
+killfeed.teamkill=TAKIM
+killfeed.suicide=İNTİHAR
+killfeed.c4=C4
+killfeed.unknown_weapon=ÖLDÜRME
 
 match.phase.freeze=Freeze Time
 match.phase.live=Round Canlı
@@ -85,6 +98,8 @@ buy.refund=Son uygun satın alımı geri al  +${0}
 buy.close_hint=B veya Esc ile kapat
 
 network.title=POLYSTRIKE ONLINE
+network.player_name=Oyuncu adı
+network.default_name=Oyuncu
 network.address=Sunucu IPv4 adresi
 network.host=Sunucu Oluştur
 network.join=Sunucuya Katıl
