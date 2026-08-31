@@ -41,6 +41,7 @@ namespace PolyStrike.Networking
             root.AddComponent<NetworkTeamVoiceChat>();
             root.AddComponent<NetworkCompetitiveAudio>();
             root.AddComponent<NetworkFirstPersonViewmodel>();
+            root.AddComponent<NetworkCompetitiveHudPolish>();
         }
 
         private void Awake()
