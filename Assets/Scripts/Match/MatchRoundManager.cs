@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using PolyStrike.Gameplay;
 using PolyStrike.Player;
 using UnityEngine;
+using Object = UnityEngine.Object;
 
 namespace PolyStrike.Match
 {
