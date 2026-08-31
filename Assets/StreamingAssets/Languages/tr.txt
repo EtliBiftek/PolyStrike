@@ -84,6 +84,8 @@ network.status.world_error=Network dünyası oluşturulamadı
 network.status.hosting=Sunucu açılıyor...
 network.status.invalid_address=Geçersiz IPv4 adresi
 network.status.connecting=Sunucuya bağlanılıyor...
+network.status.failed=Bağlantı kurulamadı
+network.retry=Tekrar Dene
 network.port_hint=UDP portu: {0}
 network.waiting=Oyuncular bekleniyor...
 network.connected=Bağlandı
@@ -94,6 +96,7 @@ network.defuse_hint=E ile C4 çöz
 network.round_winner={0} roundu kazandı
 network.local_team=Takım: {0}
 network.player_count=Oyuncu: {0}/10
+network.phase_time={0} | {1}s
 
 menu.play=Oyna
 menu.settings=Ayarlar
