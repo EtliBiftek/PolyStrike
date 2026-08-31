@@ -4,6 +4,7 @@ using PolyStrike.Core;
 using PolyStrike.Match;
 using PolyStrike.Player;
 using UnityEngine;
+using Random = UnityEngine.Random;
 
 namespace PolyStrike.Gameplay
 {
