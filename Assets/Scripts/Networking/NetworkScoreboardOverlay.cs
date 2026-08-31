@@ -16,13 +16,17 @@ namespace PolyStrike.Networking
         {
             public readonly int NetworkId;
             public readonly byte Team;
+            public readonly ushort Kills;
+            public readonly ushort Deaths;
             public readonly bool Alive;
             public readonly bool Local;
 
-            public Entry(int networkId, byte team, bool alive, bool local)
+            public Entry(int networkId, byte team, ushort kills, ushort deaths, bool alive, bool local)
             {
                 NetworkId = networkId;
                 Team = team;
+                Kills = kills;
+                Deaths = deaths;
                 Alive = alive;
                 Local = local;
             }
@@ -62,6 +66,8 @@ namespace PolyStrike.Networking
                 entries.Add(new Entry(
                     owner.NetworkId,
                     player.Team,
+                    player.Kills,
+                    player.Deaths,
                     (player.Flags & NetworkPlayerFlags.Alive) != 0,
                     isLocal));
 
@@ -78,7 +84,15 @@ namespace PolyStrike.Networking
             entries.Sort((left, right) =>
             {
                 var teamCompare = left.Team.CompareTo(right.Team);
-                return teamCompare != 0 ? teamCompare : left.NetworkId.CompareTo(right.NetworkId);
+                if (teamCompare != 0)
+                    return teamCompare;
+
+                var killCompare = right.Kills.CompareTo(left.Kills);
+                if (killCompare != 0)
+                    return killCompare;
+
+                var deathCompare = left.Deaths.CompareTo(right.Deaths);
+                return deathCompare != 0 ? deathCompare : left.NetworkId.CompareTo(right.NetworkId);
             });
 
             const float width = 660f;
@@ -125,9 +139,16 @@ namespace PolyStrike.Networking
             };
             headerStyle.normal.textColor = color;
 
+            var centeredHeader = new GUIStyle(headerStyle)
+            {
+                alignment = TextAnchor.MiddleCenter
+            };
+
             GUILayout.BeginHorizontal();
-            GUILayout.Label(team == 0 ? Localization.Get("team.t") : Localization.Get("team.ct"), headerStyle, GUILayout.Width(120f));
+            GUILayout.Label(team == 0 ? Localization.Get("team.t") : Localization.Get("team.ct"), headerStyle);
             GUILayout.FlexibleSpace();
+            GUILayout.Label(Localization.Get("scoreboard.kills"), centeredHeader, GUILayout.Width(72f));
+            GUILayout.Label(Localization.Get("scoreboard.deaths"), centeredHeader, GUILayout.Width(72f));
             GUILayout.Label(Localization.Get("scoreboard.status"), headerStyle, GUILayout.Width(110f));
             GUILayout.EndHorizontal();
 
@@ -136,6 +157,11 @@ namespace PolyStrike.Networking
                 fontSize = 16
             };
             rowStyle.normal.textColor = Color.white;
+
+            var numberStyle = new GUIStyle(rowStyle)
+            {
+                alignment = TextAnchor.MiddleCenter
+            };
 
             var statusStyle = new GUIStyle(rowStyle)
             {
@@ -160,6 +186,8 @@ namespace PolyStrike.Networking
                 GUILayout.BeginHorizontal(GUI.skin.box, GUILayout.Height(28f));
                 GUILayout.Label(playerName, rowStyle);
                 GUILayout.FlexibleSpace();
+                GUILayout.Label(entry.Kills.ToString(), numberStyle, GUILayout.Width(72f));
+                GUILayout.Label(entry.Deaths.ToString(), numberStyle, GUILayout.Width(72f));
                 GUILayout.Label(status, statusStyle, GUILayout.Width(110f));
                 GUILayout.EndHorizontal();
                 GUI.color = previousColor;
