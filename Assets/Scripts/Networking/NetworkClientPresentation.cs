@@ -11,15 +11,7 @@ namespace PolyStrike.Networking
     [DisallowMultipleComponent]
     public sealed class NetworkClientPresentation : MonoBehaviour
     {
-        private sealed class PawnView
-        {
-            public GameObject Root;
-            public Transform Head;
-            public Renderer[] Renderers;
-            public byte LastTeam = byte.MaxValue;
-        }
-
-        private readonly Dictionary<Entity, PawnView> remoteViews = new Dictionary<Entity, PawnView>();
+        private readonly Dictionary<Entity, NetworkLowPolyPawnView> remoteViews = new Dictionary<Entity, NetworkLowPolyPawnView>();
         private readonly List<Entity> staleEntities = new List<Entity>();
 
         private Camera localCamera;
@@ -28,9 +20,6 @@ namespace PolyStrike.Networking
         private NetworkMatchSnapshot matchSnapshot;
         private bool hasMatchSnapshot;
         private int playerCount;
-
-        private static readonly Color TerroristColor = new Color(0.55f, 0.36f, 0.18f);
-        private static readonly Color CounterTerroristColor = new Color(0.18f, 0.34f, 0.58f);
 
         private void Update()
         {
@@ -58,7 +47,7 @@ namespace PolyStrike.Networking
             {
                 var entity = entities[i];
                 var state = entityManager.GetComponentData<NetworkPlayerState>(entity);
-                var transform = entityManager.GetComponentData<LocalTransform>(entity);
+                var localTransform = entityManager.GetComponentData<LocalTransform>(entity);
                 var isLocal = entityManager.HasComponent<GhostOwnerIsLocal>(entity);
 
                 if (isLocal)
@@ -71,13 +60,13 @@ namespace PolyStrike.Networking
                         hasMatchSnapshot = true;
                     }
 
-                    UpdateLocalCamera(in state, in transform);
+                    UpdateLocalCamera(in state, in localTransform);
                     RemoveRemoteView(entity);
                     continue;
                 }
 
                 staleEntities.Remove(entity);
-                UpdateRemoteView(entity, in state, in transform);
+                UpdateRemoteView(entity, in state, in localTransform);
             }
 
             entities.Dispose();
@@ -95,7 +84,9 @@ namespace PolyStrike.Networking
             if (localPlayer == Entity.Null)
                 return;
 
-            DrawCrosshair();
+            var alive = (localState.Flags & NetworkPlayerFlags.Alive) != 0;
+            if (alive)
+                DrawCrosshair();
 
             var style = new GUIStyle(GUI.skin.label)
             {
@@ -105,6 +96,8 @@ namespace PolyStrike.Networking
             style.normal.textColor = Color.white;
 
             DrawMatchHud(style);
+            if (!alive)
+                return;
 
             var bottom = Screen.height - 24f;
             GUI.Label(new Rect(24f, bottom - 86f, 280f, 28f), Format("hud.health", localState.Health), style);
@@ -227,14 +220,14 @@ namespace PolyStrike.Networking
             };
         }
 
-        private void UpdateLocalCamera(in NetworkPlayerState state, in LocalTransform transform)
+        private void UpdateLocalCamera(in NetworkPlayerState state, in LocalTransform localTransform)
         {
             EnsureLocalCamera();
             if (!localCamera.gameObject.activeSelf)
                 localCamera.gameObject.SetActive(true);
 
             var eyeHeight = Mathf.Lerp(1.62f, 1.03f, state.CrouchAmount);
-            localCamera.transform.position = new Vector3(transform.Position.x, transform.Position.y + eyeHeight, transform.Position.z);
+            localCamera.transform.position = new Vector3(localTransform.Position.x, localTransform.Position.y + eyeHeight, localTransform.Position.z);
             localCamera.transform.rotation = Quaternion.Euler(-state.Pitch, state.Yaw, 0f);
 
             if ((state.Flags & NetworkPlayerFlags.Alive) != 0)
@@ -257,89 +250,15 @@ namespace PolyStrike.Networking
             cameraObject.AddComponent<AudioListener>();
         }
 
-        private void UpdateRemoteView(Entity entity, in NetworkPlayerState state, in LocalTransform transform)
+        private void UpdateRemoteView(Entity entity, in NetworkPlayerState state, in LocalTransform localTransform)
         {
             if (!remoteViews.TryGetValue(entity, out var view))
             {
-                view = CreateRemoteView();
+                view = new NetworkLowPolyPawnView();
                 remoteViews.Add(entity, view);
             }
 
-            view.Root.SetActive((state.Flags & NetworkPlayerFlags.Alive) != 0);
-            if (!view.Root.activeSelf)
-                return;
-
-            view.Root.transform.SetPositionAndRotation(
-                new Vector3(transform.Position.x, transform.Position.y, transform.Position.z),
-                Quaternion.Euler(0f, state.Yaw, 0f));
-
-            var crouchScale = Mathf.Lerp(1f, 0.75f, state.CrouchAmount);
-            view.Root.transform.localScale = new Vector3(1f, crouchScale, 1f);
-            if (view.Head != null)
-                view.Head.localRotation = Quaternion.Euler(-state.Pitch, 0f, 0f);
-
-            if (view.LastTeam != state.Team)
-            {
-                view.LastTeam = state.Team;
-                var color = state.Team == 0 ? TerroristColor : CounterTerroristColor;
-                for (var i = 0; i < view.Renderers.Length; i++)
-                    ApplyColor(view.Renderers[i], color);
-            }
-        }
-
-        private static PawnView CreateRemoteView()
-        {
-            var root = new GameObject("Network Remote Player");
-            var renderers = new List<Renderer>();
-
-            var torso = CreateBodyPart(root.transform, PrimitiveType.Cube, "Gövde", new Vector3(0f, 1.12f, 0f), new Vector3(0.52f, 0.65f, 0.34f));
-            renderers.Add(torso.GetComponent<Renderer>());
-
-            var head = CreateBodyPart(root.transform, PrimitiveType.Sphere, "Kafa", new Vector3(0f, 1.65f, 0f), new Vector3(0.34f, 0.34f, 0.34f));
-            renderers.Add(head.GetComponent<Renderer>());
-
-            var leftArm = CreateBodyPart(root.transform, PrimitiveType.Cube, "Sol Kol", new Vector3(-0.37f, 1.13f, 0f), new Vector3(0.18f, 0.62f, 0.20f));
-            var rightArm = CreateBodyPart(root.transform, PrimitiveType.Cube, "Sağ Kol", new Vector3(0.37f, 1.13f, 0f), new Vector3(0.18f, 0.62f, 0.20f));
-            var leftLeg = CreateBodyPart(root.transform, PrimitiveType.Cube, "Sol Bacak", new Vector3(-0.15f, 0.48f, 0f), new Vector3(0.22f, 0.78f, 0.24f));
-            var rightLeg = CreateBodyPart(root.transform, PrimitiveType.Cube, "Sağ Bacak", new Vector3(0.15f, 0.48f, 0f), new Vector3(0.22f, 0.78f, 0.24f));
-            renderers.Add(leftArm.GetComponent<Renderer>());
-            renderers.Add(rightArm.GetComponent<Renderer>());
-            renderers.Add(leftLeg.GetComponent<Renderer>());
-            renderers.Add(rightLeg.GetComponent<Renderer>());
-
-            return new PawnView
-            {
-                Root = root,
-                Head = head.transform,
-                Renderers = renderers.ToArray()
-            };
-        }
-
-        private static GameObject CreateBodyPart(Transform parent, PrimitiveType type, string name, Vector3 localPosition, Vector3 localScale)
-        {
-            var part = GameObject.CreatePrimitive(type);
-            part.name = name;
-            part.transform.SetParent(parent, false);
-            part.transform.localPosition = localPosition;
-            part.transform.localScale = localScale;
-
-            var collider = part.GetComponent<Collider>();
-            if (collider != null)
-                Destroy(collider);
-
-            return part;
-        }
-
-        private static void ApplyColor(Renderer renderer, Color color)
-        {
-            if (renderer == null)
-                return;
-
-            var material = renderer.material;
-            if (material.HasProperty("_BaseColor"))
-                material.SetColor("_BaseColor", color);
-            else
-                material.color = color;
+            view.Update(in state, in localTransform, Time.deltaTime);
         }
 
         private static string Format(string key, object value)
@@ -363,18 +282,14 @@ namespace PolyStrike.Networking
             if (!remoteViews.TryGetValue(entity, out var view))
                 return;
 
-            if (view.Root != null)
-                Destroy(view.Root);
+            view.Destroy();
             remoteViews.Remove(entity);
         }
 
         private void ClearViews()
         {
             foreach (var pair in remoteViews)
-            {
-                if (pair.Value.Root != null)
-                    Destroy(pair.Value.Root);
-            }
+                pair.Value.Destroy();
             remoteViews.Clear();
             localPlayer = Entity.Null;
         }
