@@ -18,12 +18,26 @@ namespace PolyStrike.Editor
             Directory.CreateDirectory(outputDirectory);
 
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+
+            // Unity refuses to create an additive scene while the active scene is still untitled.
+            // Save the bootstrap first, then add the generated network subscene content.
+            if (!EditorSceneManager.SaveScene(scene, scenePath))
+                throw new InvalidOperationException("Build sahnesi ilk kez kaydedilemedi.");
+
             var playerGhostPrefab = NetworkContentBuilder.EnsurePlayerGhostPrefab();
+            if (playerGhostPrefab == null)
+                throw new InvalidOperationException("Network player ghost prefab oluşturulamadı.");
+
             var networkSubScene = NetworkContentBuilder.RebuildNetworkSubScene(playerGhostPrefab);
+            if (networkSubScene == null)
+                throw new InvalidOperationException("Network subscene oluşturulamadı.");
+
             NetworkContentBuilder.AttachNetworkSubScene(networkSubScene);
 
             if (!EditorSceneManager.SaveScene(scene, scenePath))
                 throw new InvalidOperationException("Build sahnesi kaydedilemedi.");
+
+            AssetDatabase.SaveAssets();
 
             var options = new BuildPlayerOptions
             {
@@ -34,6 +48,9 @@ namespace PolyStrike.Editor
             };
 
             var report = BuildPipeline.BuildPlayer(options);
+            if (report == null)
+                throw new InvalidOperationException("Unity build raporu oluşturulamadı.");
+
             if (report.summary.result != BuildResult.Succeeded)
                 throw new InvalidOperationException($"Windows build başarısız: {report.summary.result}");
         }
