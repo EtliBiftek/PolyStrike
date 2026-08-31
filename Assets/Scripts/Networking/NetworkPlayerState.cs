@@ -8,6 +8,7 @@ namespace PolyStrike.Networking
     public struct NetworkPlayerState : IComponentData
     {
         [GhostField] public FixedString128Bytes PlayerName;
+        [GhostField] public FixedString64Bytes VoiceRoom;
         [GhostField(Quantization = 1000)] public float3 Position;
         [GhostField(Quantization = 1000)] public float3 Velocity;
         [GhostField(Quantization = 100)] public float Yaw;
