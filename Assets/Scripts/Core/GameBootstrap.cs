@@ -47,7 +47,7 @@ namespace PolyStrike.Core
             var player = new GameObject("Oyuncu");
             player.transform.SetPositionAndRotation(SandlineMap.TSpawns[0], tRotation);
 
-            var controller = ConfigureCharacterController(player);
+            ConfigureCharacterController(player);
             var health = player.AddComponent<Health>();
             health.SetDisableOnDeath(false);
 
@@ -94,9 +94,6 @@ namespace PolyStrike.Core
             player.AddComponent<C4Controller>();
             player.AddComponent<BuyMenu>();
             player.AddComponent<DebugHud>();
-
-            // Keep a reference alive in generated-scene builds; CharacterController is configured above.
-            _ = controller;
         }
 
         private static void CreateBots()
@@ -116,6 +113,7 @@ namespace PolyStrike.Core
             var rotation = initialTeam == MatchTeam.Terrorists ? tRotation : ctRotation;
 
             var root = new GameObject($"Bot {initialTeam} {slot + 1}");
+            root.layer = LayerMask.NameToLayer("Ignore Raycast");
             root.transform.SetPositionAndRotation(start, rotation);
             ConfigureCharacterController(root);
 
@@ -135,7 +133,7 @@ namespace PolyStrike.Core
             movement.SetHeldWeapon(weapon);
             participant.SetLoadoutReferences(weapon, null);
 
-            CreateBotVisual(root.transform, initialTeam);
+            CreateBotHitboxRig(root.transform, health, initialTeam);
             var bot = root.AddComponent<TacticalBotController>();
             bot.Configure(slot);
         }
@@ -151,29 +149,37 @@ namespace PolyStrike.Core
             return controller;
         }
 
-        private static void CreateBotVisual(Transform parent, MatchTeam team)
+        private static void CreateBotHitboxRig(Transform parent, Health health, MatchTeam team)
         {
             var color = team == MatchTeam.Terrorists
                 ? new Color(0.45f, 0.29f, 0.16f)
                 : new Color(0.18f, 0.30f, 0.43f);
 
-            CreateVisualPart(parent, "Gövde", new Vector3(0f, 1.08f, 0f), new Vector3(0.54f, 0.76f, 0.34f), color);
-            CreateVisualPart(parent, "Kafa", new Vector3(0f, 1.64f, 0f), new Vector3(0.30f, 0.30f, 0.30f), color * 1.12f);
-            CreateVisualPart(parent, "Sol Bacak", new Vector3(-0.14f, 0.48f, 0f), new Vector3(0.20f, 0.72f, 0.22f), color * 0.82f);
-            CreateVisualPart(parent, "Sağ Bacak", new Vector3(0.14f, 0.48f, 0f), new Vector3(0.20f, 0.72f, 0.22f), color * 0.82f);
+            CreateHitboxPart(parent, health, HitGroup.Head, "Kafa", new Vector3(0f, 1.66f, 0f), new Vector3(0.30f, 0.30f, 0.30f), color * 1.12f);
+            CreateHitboxPart(parent, health, HitGroup.Chest, "Göğüs", new Vector3(0f, 1.31f, 0f), new Vector3(0.54f, 0.40f, 0.30f), color);
+            CreateHitboxPart(parent, health, HitGroup.Stomach, "Mide", new Vector3(0f, 1.02f, 0f), new Vector3(0.48f, 0.24f, 0.28f), color * 0.94f);
+            CreateHitboxPart(parent, health, HitGroup.LeftArm, "Sol Kol", new Vector3(-0.37f, 1.25f, 0f), new Vector3(0.18f, 0.56f, 0.20f), color * 0.94f);
+            CreateHitboxPart(parent, health, HitGroup.RightArm, "Sağ Kol", new Vector3(0.37f, 1.25f, 0f), new Vector3(0.18f, 0.56f, 0.20f), color * 0.94f);
+            CreateHitboxPart(parent, health, HitGroup.LeftLeg, "Sol Bacak", new Vector3(-0.14f, 0.52f, 0f), new Vector3(0.20f, 0.78f, 0.22f), color * 0.82f);
+            CreateHitboxPart(parent, health, HitGroup.RightLeg, "Sağ Bacak", new Vector3(0.14f, 0.52f, 0f), new Vector3(0.20f, 0.78f, 0.22f), color * 0.82f);
         }
 
-        private static void CreateVisualPart(Transform parent, string name, Vector3 localPosition, Vector3 scale, Color color)
+        private static void CreateHitboxPart(
+            Transform parent,
+            Health health,
+            HitGroup hitGroup,
+            string name,
+            Vector3 localPosition,
+            Vector3 scale,
+            Color color)
         {
             var part = GameObject.CreatePrimitive(PrimitiveType.Cube);
             part.name = name;
+            part.layer = 0;
             part.transform.SetParent(parent, false);
             part.transform.localPosition = localPosition;
             part.transform.localScale = scale;
-
-            var collider = part.GetComponent<Collider>();
-            if (collider != null)
-                Object.Destroy(collider);
+            part.AddComponent<PlayerHitbox>().Configure(health, hitGroup);
 
             var renderer = part.GetComponent<Renderer>();
             if (renderer.material.HasProperty("_BaseColor"))
