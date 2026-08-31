@@ -63,13 +63,15 @@ namespace PolyStrike.Networking
 
             var networkTime = SystemAPI.GetSingleton<NetworkTime>();
             var subtick = QuantizeSubtick(networkTime.ServerTickFraction);
+            var currentYaw = yaw;
+            var currentPitch = pitch;
 
             Entities
                 .WithAll<GhostOwnerIsLocal>()
                 .ForEach((ref NetworkPlayerInput input) =>
                 {
                     input.Move = new float2(move.x, move.y);
-                    input.Look = new float2(yaw, pitch);
+                    input.Look = new float2(currentYaw, currentPitch);
                     input.CrouchHeld = crouch;
                     input.WalkHeld = walk;
                     input.FireHeld = fire;
