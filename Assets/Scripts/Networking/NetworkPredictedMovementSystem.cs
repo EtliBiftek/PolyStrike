@@ -83,43 +83,88 @@ namespace PolyStrike.Networking
                 var grounded = (playerState.Flags & NetworkPlayerFlags.Grounded) != 0;
                 var speedModifier = playerState.VelocityModifier > 0.001f ? playerState.VelocityModifier : 1f;
                 var maxSpeedSourceUnits = GetMaxSpeedSourceUnits(playerState.ActiveWeapon, playerState.Team);
+                var position = playerState.Position;
 
-                if (grounded)
+                if (grounded && command.Jump.IsSet && playerState.CrouchAmount < 0.95f)
                 {
-                    ApplyGroundFriction(ref planarVelocity, deltaTime);
+                    var jumpFraction = command.JumpSubtick / 255f;
+                    var beforeJump = deltaTime * jumpFraction;
+                    var afterJump = deltaTime - beforeJump;
 
-                    var maxSpeed = ToMeters(maxSpeedSourceUnits) * speedModifier;
-                    if (command.WalkHeld != 0)
-                        maxSpeed *= WalkMultiplier;
-                    maxSpeed *= math.lerp(1f, DuckMultiplier, playerState.CrouchAmount);
+                    if (beforeJump > 0.000001f)
+                    {
+                        ApplyGroundMovement(
+                            ref planarVelocity,
+                            wishDirection,
+                            inputLength,
+                            maxSpeedSourceUnits,
+                            speedModifier,
+                            command.WalkHeld != 0,
+                            playerState.CrouchAmount,
+                            beforeJump);
 
-                    Accelerate(ref planarVelocity, wishDirection, maxSpeed * inputLength, GroundAcceleration, deltaTime);
+                        var preJumpVelocity = new float3(planarVelocity.x, 0f, planarVelocity.y);
+                        NetworkSandlineCollision.SimulateMove(ref position, ref preJumpVelocity, height, beforeJump, ref grounded);
+                        planarVelocity = preJumpVelocity.xz;
+                    }
 
-                    if (command.Jump.IsSet && playerState.CrouchAmount < 0.95f)
+                    if (grounded)
                     {
                         verticalVelocity = ToMeters(JumpImpulse);
                         grounded = false;
                     }
+
+                    if (afterJump > 0.000001f)
+                    {
+                        ApplyAirAcceleration(
+                            ref planarVelocity,
+                            wishDirection,
+                            inputLength,
+                            maxSpeedSourceUnits,
+                            speedModifier,
+                            afterJump);
+
+                        verticalVelocity -= ToMeters(Gravity) * afterJump;
+                        var postJumpVelocity = new float3(planarVelocity.x, verticalVelocity, planarVelocity.y);
+                        NetworkSandlineCollision.SimulateMove(ref position, ref postJumpVelocity, height, afterJump, ref grounded);
+                        planarVelocity = postJumpVelocity.xz;
+                        verticalVelocity = postJumpVelocity.y;
+                    }
                 }
                 else
                 {
-                    ApplyAirAcceleration(
-                        ref planarVelocity,
-                        wishDirection,
-                        inputLength,
-                        maxSpeedSourceUnits,
-                        speedModifier,
-                        deltaTime);
+                    if (grounded)
+                    {
+                        ApplyGroundMovement(
+                            ref planarVelocity,
+                            wishDirection,
+                            inputLength,
+                            maxSpeedSourceUnits,
+                            speedModifier,
+                            command.WalkHeld != 0,
+                            playerState.CrouchAmount,
+                            deltaTime);
+                    }
+                    else
+                    {
+                        ApplyAirAcceleration(
+                            ref planarVelocity,
+                            wishDirection,
+                            inputLength,
+                            maxSpeedSourceUnits,
+                            speedModifier,
+                            deltaTime);
+                    }
+
+                    verticalVelocity -= ToMeters(Gravity) * deltaTime;
+                    var velocity = new float3(planarVelocity.x, verticalVelocity, planarVelocity.y);
+                    NetworkSandlineCollision.SimulateMove(ref position, ref velocity, height, deltaTime, ref grounded);
+                    planarVelocity = velocity.xz;
+                    verticalVelocity = velocity.y;
                 }
 
-                verticalVelocity -= ToMeters(Gravity) * deltaTime;
-
-                var position = playerState.Position;
-                var velocity = new float3(planarVelocity.x, verticalVelocity, planarVelocity.y);
-                NetworkSandlineCollision.SimulateMove(ref position, ref velocity, height, deltaTime, ref grounded);
-
                 playerState.Position = position;
-                playerState.Velocity = velocity;
+                playerState.Velocity = new float3(planarVelocity.x, verticalVelocity, planarVelocity.y);
                 if (grounded)
                     playerState.Flags |= NetworkPlayerFlags.Grounded;
                 else
@@ -128,6 +173,26 @@ namespace PolyStrike.Networking
                 transform.ValueRW.Position = position;
                 transform.ValueRW.Rotation = quaternion.RotateY(math.radians(playerState.Yaw));
             }
+        }
+
+        private static void ApplyGroundMovement(
+            ref float2 velocity,
+            float2 wishDirection,
+            float inputLength,
+            float maxSpeedSourceUnits,
+            float speedModifier,
+            bool walking,
+            float crouchAmount,
+            float deltaTime)
+        {
+            ApplyGroundFriction(ref velocity, deltaTime);
+
+            var maxSpeed = ToMeters(maxSpeedSourceUnits) * speedModifier;
+            if (walking)
+                maxSpeed *= WalkMultiplier;
+            maxSpeed *= math.lerp(1f, DuckMultiplier, crouchAmount);
+
+            Accelerate(ref velocity, wishDirection, maxSpeed * inputLength, GroundAcceleration, deltaTime);
         }
 
         private static void ApplyGroundFriction(ref float2 velocity, float deltaTime)
