@@ -11,6 +11,8 @@ namespace PolyStrike.Core
         private GUIStyle titleStyle;
         private GUIStyle subtitleStyle;
 
+        public static bool IsOpen { get; private set; }
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
         private static void EnsureExists()
         {
@@ -20,6 +22,21 @@ namespace PolyStrike.Core
             var root = new GameObject("PolyStrike Start Menu");
             DontDestroyOnLoad(root);
             root.AddComponent<AlphaStartMenu>();
+        }
+
+        private void Awake()
+        {
+            IsOpen = true;
+            Time.timeScale = 0f;
+        }
+
+        private void OnDestroy()
+        {
+            if (IsOpen)
+            {
+                IsOpen = false;
+                Time.timeScale = 1f;
+            }
         }
 
         private void Update()
@@ -50,7 +67,7 @@ namespace PolyStrike.Core
             GUI.Box(rect, GUIContent.none);
 
             GUILayout.BeginArea(new Rect(rect.x + 32f, rect.y + 28f, rect.width - 64f, rect.height - 56f));
-            GUILayout.Label("POLYSTRIKE", titleStyle);
+            GUILayout.Label(Localization.Get("start.title"), titleStyle);
             GUILayout.Label(Localization.Get("start.subtitle"), subtitleStyle);
             GUILayout.Space(28f);
 
@@ -72,6 +89,8 @@ namespace PolyStrike.Core
         private void StartOffline()
         {
             choiceMade = true;
+            IsOpen = false;
+            Time.timeScale = 1f;
             if (networkMenu != null)
                 networkMenu.enabled = false;
 
@@ -82,6 +101,8 @@ namespace PolyStrike.Core
         private void OpenOnlineMenu()
         {
             choiceMade = true;
+            IsOpen = false;
+            Time.timeScale = 1f;
             networkMenu ??= FindFirstObjectByType<NetworkConnectionMenu>();
             if (networkMenu != null)
                 networkMenu.enabled = true;
