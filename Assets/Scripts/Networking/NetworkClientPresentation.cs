@@ -53,6 +53,7 @@ namespace PolyStrike.Networking
                 staleEntities.Add(pair.Key);
 
             localPlayer = Entity.Null;
+            hasMatchSnapshot = false;
             for (var i = 0; i < entities.Length; i++)
             {
                 var entity = entities[i];
@@ -64,6 +65,12 @@ namespace PolyStrike.Networking
                 {
                     localPlayer = entity;
                     localState = state;
+                    if (entityManager.HasComponent<NetworkMatchSnapshot>(entity))
+                    {
+                        matchSnapshot = entityManager.GetComponentData<NetworkMatchSnapshot>(entity);
+                        hasMatchSnapshot = true;
+                    }
+
                     UpdateLocalCamera(in state, in transform);
                     RemoveRemoteView(entity);
                     continue;
@@ -75,8 +82,6 @@ namespace PolyStrike.Networking
 
             entities.Dispose();
             query.Dispose();
-
-            ReadMatchSnapshot(entityManager);
 
             for (var i = 0; i < staleEntities.Count; i++)
                 RemoveRemoteView(staleEntities[i]);
@@ -121,23 +126,6 @@ namespace PolyStrike.Networking
             {
                 alignment = TextAnchor.UpperRight
             });
-        }
-
-        private void ReadMatchSnapshot(EntityManager entityManager)
-        {
-            var query = entityManager.CreateEntityQuery(ComponentType.ReadOnly<NetworkMatchSnapshot>());
-            if (query.CalculateEntityCount() == 0)
-            {
-                hasMatchSnapshot = false;
-                query.Dispose();
-                return;
-            }
-
-            var snapshots = query.ToComponentDataArray<NetworkMatchSnapshot>(Allocator.Temp);
-            matchSnapshot = snapshots[0];
-            hasMatchSnapshot = true;
-            snapshots.Dispose();
-            query.Dispose();
         }
 
         private void DrawMatchHud(GUIStyle baseStyle)
