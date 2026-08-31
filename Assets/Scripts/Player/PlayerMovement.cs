@@ -35,6 +35,12 @@ namespace PolyStrike.Player
         private float externalMaxSpeedSourceUnits = -1f;
         private bool roundMovementLocked;
 
+        private bool movementCommandOverride;
+        private Vector2 commandedMove;
+        private bool commandedWalk;
+        private bool commandedCrouch;
+        private bool commandedJump;
+
         private float velocityModifier = 1f;
         private float pendingTagFactor = 1f;
         private float pendingTagApplyTime = -1f;
@@ -70,6 +76,24 @@ namespace PolyStrike.Player
             externalMaxSpeedSourceUnits = -1f;
         }
 
+        public void SetMovementCommand(Vector2 move, bool walk, bool crouch, bool jump)
+        {
+            movementCommandOverride = true;
+            commandedMove = Vector2.ClampMagnitude(move, 1f);
+            commandedWalk = walk;
+            commandedCrouch = crouch;
+            commandedJump |= jump;
+        }
+
+        public void ClearMovementCommand()
+        {
+            movementCommandOverride = false;
+            commandedMove = Vector2.zero;
+            commandedWalk = false;
+            commandedCrouch = false;
+            commandedJump = false;
+        }
+
         public void SetRoundMovementLocked(bool locked)
         {
             roundMovementLocked = locked;
@@ -90,6 +114,7 @@ namespace PolyStrike.Player
             rapidTagHits = 0;
             lastTagTime = -10f;
             duckAmount = 0f;
+            commandedJump = false;
             UpdateControllerHeight();
         }
 
@@ -124,10 +149,11 @@ namespace PolyStrike.Player
             {
                 planarVelocity = Vector3.zero;
                 verticalVelocity = 0f;
+                commandedJump = false;
                 return;
             }
 
-            var input = GameInput.Movement;
+            var input = movementCommandOverride ? commandedMove : GameInput.Movement;
             var inputLength = Mathf.Clamp01(input.magnitude);
             var wishDirection = transform.forward * input.y + transform.right * input.x;
             if (wishDirection.sqrMagnitude > 0.001f)
@@ -140,10 +166,12 @@ namespace PolyStrike.Player
 
                 ApplyGroundFriction();
 
-                var wishSpeed = GetGroundWishSpeed(inputLength);
+                var walkHeld = movementCommandOverride ? commandedWalk : GameInput.WalkHeld;
+                var wishSpeed = GetGroundWishSpeed(inputLength, walkHeld);
                 Accelerate(wishDirection, wishSpeed, GroundAcceleration);
 
-                if (GameInput.JumpPressed && duckAmount < 0.95f)
+                var jumpPressed = movementCommandOverride ? commandedJump : GameInput.JumpPressed;
+                if (jumpPressed && duckAmount < 0.95f)
                 {
                     verticalVelocity = SourceUnit.ToMeters(JumpImpulse);
                     LastJumpTime = Time.time;
@@ -154,6 +182,7 @@ namespace PolyStrike.Player
                 ApplyAirAcceleration(wishDirection, inputLength);
             }
 
+            commandedJump = false;
             verticalVelocity -= SourceUnit.ToMeters(Gravity) * Time.deltaTime;
 
             var velocity = planarVelocity + Vector3.up * verticalVelocity;
@@ -182,11 +211,11 @@ namespace PolyStrike.Player
             velocityModifier = Mathf.MoveTowards(velocityModifier, 1f, TagRecoveryPerSecond * Time.deltaTime);
         }
 
-        private float GetGroundWishSpeed(float inputLength)
+        private float GetGroundWishSpeed(float inputLength, bool walkHeld)
         {
             var maxSpeed = SourceUnit.ToMeters(MaxSpeedSourceUnits) * velocityModifier;
 
-            if (GameInput.WalkHeld)
+            if (walkHeld)
                 maxSpeed *= WalkMultiplier;
 
             maxSpeed *= Mathf.Lerp(1f, DuckMultiplier, duckAmount);
@@ -243,7 +272,8 @@ namespace PolyStrike.Player
 
         private void UpdateDuck()
         {
-            var target = roundMovementLocked ? 0f : GameInput.CrouchHeld ? 1f : 0f;
+            var crouchHeld = movementCommandOverride ? commandedCrouch : GameInput.CrouchHeld;
+            var target = roundMovementLocked ? 0f : crouchHeld ? 1f : 0f;
             duckAmount = Mathf.MoveTowards(duckAmount, target, DuckRate * Time.deltaTime);
             UpdateControllerHeight();
         }
