@@ -12,6 +12,7 @@ namespace PolyStrike.Match
         private static readonly List<MatchParticipant> Participants = new List<MatchParticipant>();
 
         private Health health;
+        private PlayerMovement movement;
         private HitscanWeapon weapon;
         private UtilityController utility;
         private C4Controller c4;
@@ -38,6 +39,7 @@ namespace PolyStrike.Match
         private void Awake()
         {
             health = GetComponent<Health>();
+            movement = GetComponent<PlayerMovement>();
             tSpawnPosition = transform.position;
             ctSpawnPosition = transform.position;
             tSpawnRotation = transform.rotation;
@@ -69,6 +71,8 @@ namespace PolyStrike.Match
             Team = team;
             IsLocalPlayer = localPlayer;
 
+            movement ??= GetComponent<PlayerMovement>();
+
             if (GetComponent<BombDeathDropGuard>() == null)
                 gameObject.AddComponent<BombDeathDropGuard>();
 
@@ -92,6 +96,7 @@ namespace PolyStrike.Match
 
             weapon = hitscanWeapon;
             utility = utilityController;
+            movement ??= GetComponent<PlayerMovement>();
 
             if (weapon != null)
             {
@@ -108,6 +113,7 @@ namespace PolyStrike.Match
             CarriesBomb = false;
 
             health.ResetForRound(true);
+            movement?.ResetRoundMotion();
             weapon?.ResetForHalf(team);
             utility?.ResetForHalf();
             RestoreSpawn();
@@ -120,6 +126,7 @@ namespace PolyStrike.Match
         {
             var diedLastRound = health.IsDead;
             health.ResetForRound(diedLastRound);
+            movement?.ResetRoundMotion();
 
             if (diedLastRound)
             {
