@@ -57,11 +57,14 @@ namespace PolyStrike.Networking
                 var shooter = state.EntityManager.GetComponentData<NetworkPlayerState>(shooterEntity);
                 var input = state.EntityManager.GetComponentData<NetworkPlayerInput>(shooterEntity);
                 var runtime = state.EntityManager.GetComponentData<NetworkWeaponRuntime>(shooterEntity);
+                var interpolationDelay = state.EntityManager.HasComponent<CommandDataInterpolationDelay>(shooterEntity)
+                    ? state.EntityManager.GetComponentData<CommandDataInterpolationDelay>(shooterEntity).Delay
+                    : 0u;
 
                 TickWeaponRuntime(ref shooter, in input, ref runtime, deltaTime);
 
                 if ((shooter.Flags & NetworkPlayerFlags.Alive) != 0 && WantsToFire(in shooter, in input, in runtime))
-                    TryFire(ref state, shooterEntity, ref shooter, in input, ref runtime, serverTick, entities);
+                    TryFire(ref state, shooterEntity, ref shooter, in input, ref runtime, serverTick, interpolationDelay, entities);
 
                 state.EntityManager.SetComponentData(shooterEntity, shooter);
                 state.EntityManager.SetComponentData(shooterEntity, runtime);
@@ -150,6 +153,7 @@ namespace PolyStrike.Networking
             in NetworkPlayerInput input,
             ref NetworkWeaponRuntime runtime,
             NetworkTick serverTick,
+            uint interpolationDelay,
             NativeArray<Entity> players)
         {
             var profile = WeaponProfile.Get(shooter.Team, shooter.ActiveWeapon);
@@ -182,7 +186,7 @@ namespace PolyStrike.Networking
                     continue;
 
                 var history = state.EntityManager.GetBuffer<NetworkPlayerPoseHistory>(targetEntity);
-                if (!TryGetRewoundPose(in history, serverTick, input.FireSubtick, out var pose))
+                if (!TryGetRewoundPose(in history, serverTick, interpolationDelay, input.FireSubtick, out var pose))
                     pose = new NetworkPlayerPoseHistory
                     {
                         Tick = serverTick,
@@ -239,18 +243,22 @@ namespace PolyStrike.Networking
         private static bool TryGetRewoundPose(
             in DynamicBuffer<NetworkPlayerPoseHistory> history,
             NetworkTick currentTick,
+            uint interpolationDelay,
             byte subtick,
             out NetworkPlayerPoseHistory pose)
         {
+            pose = default;
+            if (!currentTick.IsValid || history.Length == 0)
+                return false;
+
             var shotTick = currentTick;
-            if (history.Length > 0)
+            shotTick.Subtract(math.min(interpolationDelay, (uint)MaxUnlagTicks));
+
+            var oldest = history[0].Tick;
+            if (oldest.IsValid && oldest.IsNewerThan(shotTick))
             {
-                var oldest = history[0].Tick;
-                if (shotTick.IsNewerThan(oldest) && shotTick.TicksSince(oldest) > MaxUnlagTicks)
-                {
-                    pose = history[0];
-                    return true;
-                }
+                pose = history[0];
+                return true;
             }
 
             return SubtickPoseRewind.TrySample(in history, shotTick, subtick, out pose);
