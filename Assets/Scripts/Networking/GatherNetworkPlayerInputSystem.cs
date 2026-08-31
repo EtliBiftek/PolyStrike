@@ -11,6 +11,7 @@ namespace PolyStrike.Networking
         protected override void OnCreate()
         {
             RequireForUpdate<NetworkPlayerInput>();
+            RequireForUpdate<NetworkTime>();
         }
 
         protected override void OnUpdate()
@@ -18,11 +19,21 @@ namespace PolyStrike.Networking
             var move = GameInput.Movement;
             var look = GameInput.MouseDelta;
             var jump = GameInput.JumpPressed;
+            var firePressed = GameInput.FirePressed;
+            var fireReleased = GameInput.FireReleased;
+            var secondaryPressed = GameInput.SecondaryFirePressed;
+            var secondaryReleased = GameInput.SecondaryFireReleased;
             var reload = GameInput.ReloadPressed;
+            var drop = GameInput.DropPressed;
             var crouch = GameInput.CrouchHeld ? (byte)1 : (byte)0;
+            var walk = GameInput.WalkHeld ? (byte)1 : (byte)0;
             var fire = GameInput.FireHeld ? (byte)1 : (byte)0;
             var secondaryFire = GameInput.SecondaryFireHeld ? (byte)1 : (byte)0;
+            var use = GameInput.UseHeld ? (byte)1 : (byte)0;
             var slot = ResolveWeaponSlot();
+
+            var networkTime = SystemAPI.GetSingleton<NetworkTime>();
+            var subtick = QuantizeSubtick(networkTime.ServerTickFraction);
 
             Entities
                 .WithAll<GhostOwnerIsLocal>()
@@ -31,16 +42,48 @@ namespace PolyStrike.Networking
                     input.Move = new float2(move.x, move.y);
                     input.Look = new float2(look.x, look.y);
                     input.CrouchHeld = crouch;
+                    input.WalkHeld = walk;
                     input.FireHeld = fire;
                     input.SecondaryFireHeld = secondaryFire;
+                    input.UseHeld = use;
                     input.WeaponSlot = slot;
 
                     if (jump)
+                    {
                         input.Jump.Set();
+                        input.JumpSubtick = subtick;
+                    }
+
+                    if (firePressed)
+                    {
+                        input.FirePressed.Set();
+                        input.FireSubtick = subtick;
+                    }
+
+                    if (fireReleased)
+                        input.FireReleased.Set();
+
+                    if (secondaryPressed)
+                    {
+                        input.SecondaryFirePressed.Set();
+                        input.SecondaryFireSubtick = subtick;
+                    }
+
+                    if (secondaryReleased)
+                        input.SecondaryFireReleased.Set();
+
                     if (reload)
                         input.Reload.Set();
+
+                    if (drop)
+                        input.Drop.Set();
                 })
                 .Run();
+        }
+
+        private static byte QuantizeSubtick(float fraction)
+        {
+            return (byte)math.clamp((int)math.round(math.saturate(fraction) * 255f), 0, 255);
         }
 
         private static byte ResolveWeaponSlot()
@@ -49,6 +92,10 @@ namespace PolyStrike.Networking
             if (GameInput.Weapon2Pressed) return 2;
             if (GameInput.UtilityPressed) return 4;
             if (GameInput.BombPressed) return 5;
+            if (GameInput.HeGrenadePressed) return 6;
+            if (GameInput.FlashbangPressed) return 7;
+            if (GameInput.SmokePressed) return 8;
+            if (GameInput.MolotovPressed) return 10;
             return 0;
         }
     }
