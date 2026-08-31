@@ -97,6 +97,17 @@ namespace PolyStrike.Networking
             public float ExpiresAt;
         }
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        private static void EnsureExists()
+        {
+            if (FindFirstObjectByType<NetworkKillFeedOverlay>() != null)
+                return;
+
+            var root = new GameObject("Network Kill Feed");
+            DontDestroyOnLoad(root);
+            root.AddComponent<NetworkKillFeedOverlay>();
+        }
+
         private void Update()
         {
             ConsumeEvents();
