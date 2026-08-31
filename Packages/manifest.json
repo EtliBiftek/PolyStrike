@@ -1,6 +1,7 @@
 {
   "dependencies": {
     "com.unity.ai.navigation": "2.0.9",
+    "com.unity.charactercontroller": "1.4.1",
     "com.unity.inputsystem": "1.17.0",
     "com.unity.multiplayer.playmode": "1.6.2",
     "com.unity.netcode": "1.10.0",
