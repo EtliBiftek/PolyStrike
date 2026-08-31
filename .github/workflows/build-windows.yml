@@ -14,7 +14,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Check Unity CI credentials
         id: unity_credentials
@@ -33,7 +33,7 @@ jobs:
 
       - name: Cache Unity Library
         if: steps.unity_credentials.outputs.ready == 'true'
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: Library
           key: Library-${{ runner.os }}-${{ hashFiles('Assets/**', 'Packages/**', 'ProjectSettings/**') }}
@@ -56,7 +56,7 @@ jobs:
 
       - name: Upload Windows build
         if: steps.unity_credentials.outputs.ready == 'true'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: PolyStrike-Windows-x64
           path: build/Windows
