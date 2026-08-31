@@ -8,6 +8,7 @@ namespace PolyStrike.Networking
 {
     public struct NetworkJoinRequest : IRpcCommand
     {
+        public FixedString128Bytes PlayerName;
     }
 
     public struct ClientJoinRequestSent : IComponentData
@@ -54,7 +55,7 @@ namespace PolyStrike.Networking
             }
 
             var commandBuffer = new EntityCommandBuffer(Allocator.Temp);
-            foreach (var (request, _, rpcEntity) in SystemAPI.Query<RefRO<ReceiveRpcCommandRequest>, RefRO<NetworkJoinRequest>>().WithEntityAccess())
+            foreach (var (request, join, rpcEntity) in SystemAPI.Query<RefRO<ReceiveRpcCommandRequest>, RefRO<NetworkJoinRequest>>().WithEntityAccess())
             {
                 var connection = request.ValueRO.SourceConnection;
                 if (!SystemAPI.HasComponent<PolyStrikeConnectionAccepted>(connection) ||
@@ -91,8 +92,13 @@ namespace PolyStrike.Networking
 
                 var pistolMagazine = team == 0 ? (byte)20 : (byte)12;
                 var pistolReserve = team == 0 ? (byte)120 : (byte)24;
+                var playerName = join.ValueRO.PlayerName;
+                if (playerName.IsEmpty)
+                    playerName = new FixedString128Bytes($"Player {networkId}");
+
                 commandBuffer.SetComponent(player, new NetworkPlayerState
                 {
+                    PlayerName = playerName,
                     Position = position,
                     Velocity = float3.zero,
                     Yaw = yaw,
@@ -102,6 +108,9 @@ namespace PolyStrike.Networking
                     Health = joinAlive ? (ushort)100 : (ushort)0,
                     Armor = 0,
                     Money = NetworkMatchRules.StartMoney,
+                    Kills = 0,
+                    Deaths = 0,
+                    PingMs = 0,
                     Team = team,
                     ActiveWeapon = 2,
                     MagazineAmmo = pistolMagazine,
