@@ -40,6 +40,7 @@ namespace PolyStrike.Networking
             root.AddComponent<NetworkSpectatorController>();
             root.AddComponent<NetworkTeamVoiceChat>();
             root.AddComponent<NetworkCompetitiveAudio>();
+            root.AddComponent<NetworkFirstPersonViewmodel>();
         }
 
         private void Awake()
