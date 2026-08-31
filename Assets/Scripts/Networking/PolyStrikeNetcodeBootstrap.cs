@@ -22,6 +22,7 @@ namespace PolyStrike.Networking
 
             CreateDefaultClientServerWorlds();
             ConfigureServerTickRate();
+            ConfigureLagCompensationHistory();
             return true;
         }
 
@@ -39,6 +40,30 @@ namespace PolyStrike.Networking
             };
             tickRate.ResolveDefaults();
             serverWorld.EntityManager.CreateSingleton(tickRate);
+        }
+
+        private static void ConfigureLagCompensationHistory()
+        {
+            var serverWorld = ServerWorld;
+            if (serverWorld != null && serverWorld.IsCreated)
+            {
+                serverWorld.EntityManager.CreateSingleton(new LagCompensationConfig
+                {
+                    // Zero uses Netcode's full supported server history capacity.
+                    ServerHistorySize = 0,
+                    ClientHistorySize = 1
+                });
+            }
+
+            var clientWorld = ClientWorld;
+            if (clientWorld != null && clientWorld.IsCreated)
+            {
+                clientWorld.EntityManager.CreateSingleton(new LagCompensationConfig
+                {
+                    ServerHistorySize = 0,
+                    ClientHistorySize = 1
+                });
+            }
         }
     }
 }
