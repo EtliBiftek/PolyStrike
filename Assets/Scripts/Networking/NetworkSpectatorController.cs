@@ -20,6 +20,17 @@ namespace PolyStrike.Networking
         private bool spectating;
         private bool chaseMode;
 
+        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.AfterSceneLoad)]
+        private static void EnsureExists()
+        {
+            if (FindFirstObjectByType<NetworkSpectatorController>() != null)
+                return;
+
+            var root = new GameObject("Network Spectator");
+            DontDestroyOnLoad(root);
+            root.AddComponent<NetworkSpectatorController>();
+        }
+
         private void LateUpdate()
         {
             var world = ClientServerBootstrap.ClientWorld;
