@@ -88,11 +88,14 @@ namespace PolyStrike.Networking
                     Yaw = yaw,
                     Pitch = 0f,
                     CrouchAmount = 0f,
+                    VelocityModifier = 1f,
                     Health = 100,
                     Armor = 0,
+                    Money = 800,
                     Team = team,
-                    ActiveWeapon = team == 0 ? (byte)3 : (byte)4,
+                    ActiveWeapon = 2,
                     MagazineAmmo = team == 0 ? (byte)20 : (byte)12,
+                    ReserveAmmo = team == 0 ? (byte)120 : (byte)24,
                     Flags = NetworkPlayerFlags.Alive | NetworkPlayerFlags.Grounded
                 });
 
@@ -117,7 +120,7 @@ namespace PolyStrike.Networking
         private static float3 GetSpawn(byte team, int slot)
         {
             var x = -1.6f + math.clamp(slot, 0, 4) * 0.8f;
-            return new float3(x, 0.05f, team == 0 ? -24f : 24f);
+            return new float3(x, NetworkSandlineCollision.GroundY, team == 0 ? -24f : 24f);
         }
     }
 }
