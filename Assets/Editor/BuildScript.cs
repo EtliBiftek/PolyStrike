@@ -18,6 +18,10 @@ namespace PolyStrike.Editor
             Directory.CreateDirectory(outputDirectory);
 
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
+            var playerGhostPrefab = NetworkContentBuilder.EnsurePlayerGhostPrefab();
+            var networkSubScene = NetworkContentBuilder.RebuildNetworkSubScene(playerGhostPrefab);
+            NetworkContentBuilder.AttachNetworkSubScene(networkSubScene);
+
             if (!EditorSceneManager.SaveScene(scene, scenePath))
                 throw new InvalidOperationException("Build sahnesi kaydedilemedi.");
 
