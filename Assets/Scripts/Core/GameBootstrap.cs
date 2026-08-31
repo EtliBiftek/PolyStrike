@@ -25,6 +25,102 @@ namespace PolyStrike.Core
             CreateMatchManager();
         }
 
+        public static MatchParticipant ConsoleAddBot(MatchTeam team)
+        {
+            var sameTeam = 0;
+            var all = MatchParticipant.All;
+            for (var i = 0; i < all.Count; i++)
+            {
+                if (all[i] != null && all[i].Team == team)
+                    sameTeam++;
+            }
+
+            if (sameTeam >= 5)
+                return null;
+
+            var spawns = team == MatchTeam.Terrorists ? SandlineMap.TSpawns : SandlineMap.CTSpawns;
+            var slot = 0;
+            var bestDistance = float.NegativeInfinity;
+            for (var candidate = 0; candidate < spawns.Length; candidate++)
+            {
+                var nearest = float.PositiveInfinity;
+                for (var i = 0; i < all.Count; i++)
+                {
+                    var participant = all[i];
+                    if (participant == null || participant.Team != team)
+                        continue;
+                    nearest = Mathf.Min(nearest, Vector3.Distance(participant.SpawnPosition, spawns[candidate]));
+                }
+
+                if (nearest > bestDistance)
+                {
+                    bestDistance = nearest;
+                    slot = candidate;
+                }
+            }
+
+            var bot = CreateBot(team, slot);
+            MatchRoundManager.Instance?.RegisterParticipant(bot);
+            bot.BeginHalf(team);
+            return bot;
+        }
+
+        public static int ConsoleKickBots()
+        {
+            var count = 0;
+            var snapshot = new MatchParticipant[MatchParticipant.All.Count];
+            for (var i = 0; i < snapshot.Length; i++)
+                snapshot[i] = MatchParticipant.All[i];
+
+            for (var i = 0; i < snapshot.Length; i++)
+            {
+                var participant = snapshot[i];
+                if (participant == null || participant.IsLocalPlayer)
+                    continue;
+
+                MatchRoundManager.Instance?.UnregisterParticipant(participant);
+                Object.Destroy(participant.gameObject);
+                count++;
+            }
+
+            return count;
+        }
+
+        public static bool ConsolePlaceBot()
+        {
+            var camera = Camera.main;
+            if (camera == null)
+                return false;
+
+            MatchParticipant target = null;
+            var all = MatchParticipant.All;
+            for (var i = 0; i < all.Count; i++)
+            {
+                if (all[i] != null && !all[i].IsLocalPlayer)
+                {
+                    target = all[i];
+                    break;
+                }
+            }
+
+            if (target == null)
+                return false;
+
+            var ray = new Ray(camera.transform.position, camera.transform.forward);
+            var position = camera.transform.position + camera.transform.forward * 4f;
+            if (Physics.Raycast(ray, out var hit, 80f, Physics.DefaultRaycastLayers, QueryTriggerInteraction.Ignore))
+                position = hit.point + hit.normal * 0.35f;
+
+            var controller = target.GetComponent<CharacterController>();
+            if (controller != null)
+                controller.enabled = false;
+            target.transform.position = position;
+            if (controller != null)
+                controller.enabled = true;
+            target.GetComponent<PlayerMovement>()?.ResetRoundMotion();
+            return true;
+        }
+
         private static void CreateLighting()
         {
             if (Object.FindFirstObjectByType<Light>() != null)
@@ -105,8 +201,9 @@ namespace PolyStrike.Core
                 CreateBot(MatchTeam.CounterTerrorists, slot);
         }
 
-        private static void CreateBot(MatchTeam initialTeam, int slot)
+        private static MatchParticipant CreateBot(MatchTeam initialTeam, int slot)
         {
+            slot = Mathf.Clamp(slot, 0, 4);
             var tRotation = Quaternion.Euler(0f, 0f, 0f);
             var ctRotation = Quaternion.Euler(0f, 180f, 0f);
             var start = initialTeam == MatchTeam.Terrorists ? SandlineMap.TSpawns[slot] : SandlineMap.CTSpawns[slot];
@@ -136,6 +233,7 @@ namespace PolyStrike.Core
             CreateBotHitboxRig(root.transform, health, initialTeam);
             var bot = root.AddComponent<TacticalBotController>();
             bot.Configure(slot);
+            return participant;
         }
 
         private static CharacterController ConfigureCharacterController(GameObject root)
