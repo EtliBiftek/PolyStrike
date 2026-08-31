@@ -1,3 +1,4 @@
+using Unity.Entities;
 using Unity.NetCode;
 using UnityEngine;
 using UnityEngine.Scripting;
