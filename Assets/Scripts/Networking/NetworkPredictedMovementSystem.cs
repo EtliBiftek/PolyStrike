@@ -25,7 +25,7 @@ namespace PolyStrike.Networking
         {
             state.RequireForUpdate<NetworkTime>();
             state.RequireForUpdate(SystemAPI.QueryBuilder()
-                .WithAll<NetworkPlayerState, NetworkPlayerInput, LocalTransform>()
+                .WithAll<NetworkPlayerState, NetworkPlayerInput, NetworkMatchSnapshot, LocalTransform>()
                 .Build());
         }
 
@@ -35,32 +35,43 @@ namespace PolyStrike.Networking
             if (deltaTime <= 0f)
                 return;
 
-            foreach (var (player, input, transform) in
-                     SystemAPI.Query<RefRW<NetworkPlayerState>, RefRO<NetworkPlayerInput>, RefRW<LocalTransform>>()
+            foreach (var (player, input, match, transform) in
+                     SystemAPI.Query<RefRW<NetworkPlayerState>, RefRO<NetworkPlayerInput>, RefRO<NetworkMatchSnapshot>, RefRW<LocalTransform>>()
                          .WithAll<Simulate>())
             {
                 ref var playerState = ref player.ValueRW;
                 var command = input.ValueRO;
-
-                if ((playerState.Flags & NetworkPlayerFlags.Alive) == 0)
-                {
-                    playerState.Velocity = float3.zero;
-                    continue;
-                }
 
                 playerState.Yaw = WrapAngle(command.Look.x);
                 playerState.Pitch = math.clamp(command.Look.y, -89f, 89f);
 
                 var crouchTarget = command.CrouchHeld != 0 ? 1f : 0f;
                 playerState.CrouchAmount = MoveTowards(playerState.CrouchAmount, crouchTarget, DuckRate * deltaTime);
-                var height = math.lerp(NetworkSandlineCollision.StandingHeight, NetworkSandlineCollision.CrouchingHeight, playerState.CrouchAmount);
+                if (playerState.CrouchAmount > 0.5f)
+                    playerState.Flags |= NetworkPlayerFlags.Crouching;
+                else
+                    playerState.Flags &= unchecked((byte)~NetworkPlayerFlags.Crouching);
 
+                var canMove = (playerState.Flags & NetworkPlayerFlags.Alive) != 0 &&
+                              (match.ValueRO.Phase == NetworkMatchPhase.Live || match.ValueRO.Phase == NetworkMatchPhase.PostPlant) &&
+                              (playerState.Flags & (NetworkPlayerFlags.Planting | NetworkPlayerFlags.Defusing)) == 0;
+
+                if (!canMove)
+                {
+                    playerState.Velocity = float3.zero;
+                    transform.ValueRW.Position = playerState.Position;
+                    transform.ValueRW.Rotation = quaternion.RotateY(math.radians(playerState.Yaw));
+                    continue;
+                }
+
+                var height = math.lerp(NetworkSandlineCollision.StandingHeight, NetworkSandlineCollision.CrouchingHeight, playerState.CrouchAmount);
                 var planarVelocity = playerState.Velocity.xz;
                 var verticalVelocity = playerState.Velocity.y;
                 var moveInput = command.Move;
-                var inputLength = math.saturate(math.length(moveInput));
-                if (inputLength > 1f)
-                    moveInput /= inputLength;
+                var rawInputLength = math.length(moveInput);
+                var inputLength = math.min(rawInputLength, 1f);
+                if (rawInputLength > 1f)
+                    moveInput /= rawInputLength;
 
                 var yawRadians = math.radians(playerState.Yaw);
                 var forward = new float2(math.sin(yawRadians), math.cos(yawRadians));
@@ -112,7 +123,7 @@ namespace PolyStrike.Networking
                 if (grounded)
                     playerState.Flags |= NetworkPlayerFlags.Grounded;
                 else
-                    playerState.Flags &= ~NetworkPlayerFlags.Grounded;
+                    playerState.Flags &= unchecked((byte)~NetworkPlayerFlags.Grounded);
 
                 transform.ValueRW.Position = position;
                 transform.ValueRW.Rotation = quaternion.RotateY(math.radians(playerState.Yaw));
