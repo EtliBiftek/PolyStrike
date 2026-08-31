@@ -151,10 +151,23 @@ console.not_bound=Bu tuşa komut atanmamış.
 console.exec_missing=CFG bulunamadı: {0}
 console.exec_done=CFG çalıştırıldı: {0}
 
+start.title=POLYSTRIKE
 start.subtitle=Low-poly rekabetçi 5v5 alpha
 start.offline=BOTLARLA 5v5 OYNA
 start.online=ONLINE OYNA
 start.console_hint=~ tuşu ile geliştirici konsolunu açabilirsin.
+
+pause.title=DURAKLATILDI
+pause.resume=DEVAM ET
+pause.settings=AYARLAR
+pause.console=KONSOLU AÇ
+pause.sensitivity=Hassasiyet: {0}
+pause.volume=Ana ses: %{0}
+pause.fps=FPS sınırı: {0}
+pause.unlimited=Sınırsız
+pause.fullscreen_on=Tam ekran: Açık
+pause.fullscreen_off=Tam ekran: Kapalı
+pause.back=GERİ
 
 menu.play=Oyna
 menu.settings=Ayarlar
