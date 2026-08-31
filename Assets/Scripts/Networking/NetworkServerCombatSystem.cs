@@ -231,11 +231,20 @@ namespace PolyStrike.Networking
             if (targetState.Team == shooter.Team)
                 damage *= FriendlyFireScale;
 
+            var wasAlive = (targetState.Flags & NetworkPlayerFlags.Alive) != 0;
             ApplyDamage(ref targetState, bestHitGroup, damage, profile.ArmorPenetration);
             ApplyTag(ref state, bestTarget, in profile);
 
-            if ((targetState.Flags & NetworkPlayerFlags.Alive) == 0 && targetState.Team != shooter.Team)
-                shooter.Money = (ushort)math.min(16000, shooter.Money + profile.KillReward);
+            var killed = wasAlive && (targetState.Flags & NetworkPlayerFlags.Alive) == 0;
+            if (killed)
+            {
+                targetState.Deaths = (ushort)math.min(ushort.MaxValue, targetState.Deaths + 1);
+                if (targetState.Team != shooter.Team)
+                {
+                    shooter.Kills = (ushort)math.min(ushort.MaxValue, shooter.Kills + 1);
+                    shooter.Money = (ushort)math.min(16000, shooter.Money + profile.KillReward);
+                }
+            }
 
             state.EntityManager.SetComponentData(bestTarget, targetState);
         }
