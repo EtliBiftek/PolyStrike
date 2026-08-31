@@ -81,6 +81,9 @@ namespace PolyStrike.Networking
                 commandBuffer.SetComponent(player, LocalTransform.FromPositionRotation(
                     position,
                     quaternion.RotateY(math.radians(yaw))));
+
+                var pistolMagazine = team == 0 ? (byte)20 : (byte)12;
+                var pistolReserve = team == 0 ? (byte)120 : (byte)24;
                 commandBuffer.SetComponent(player, new NetworkPlayerState
                 {
                     Position = position,
@@ -91,12 +94,17 @@ namespace PolyStrike.Networking
                     VelocityModifier = 1f,
                     Health = 100,
                     Armor = 0,
-                    Money = 800,
+                    Money = NetworkMatchRules.StartMoney,
                     Team = team,
                     ActiveWeapon = 2,
-                    MagazineAmmo = team == 0 ? (byte)20 : (byte)12,
-                    ReserveAmmo = team == 0 ? (byte)120 : (byte)24,
+                    MagazineAmmo = pistolMagazine,
+                    ReserveAmmo = pistolReserve,
                     Flags = NetworkPlayerFlags.Alive | NetworkPlayerFlags.Grounded
+                });
+                commandBuffer.SetComponent(player, new NetworkLoadoutState
+                {
+                    PistolMagazine = pistolMagazine,
+                    PistolReserve = pistolReserve
                 });
 
                 commandBuffer.AppendToBuffer(connection, new LinkedEntityGroup { Value = player });
