@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using PolyStrike.Maps;
 using PolyStrike.Match;
 using UnityEngine;
@@ -38,6 +39,7 @@ namespace PolyStrike.AI
 
         private readonly TeamState terrorists = new TeamState();
         private readonly TeamState counterTerrorists = new TeamState();
+        private readonly HashSet<MatchParticipant> observedParticipants = new HashSet<MatchParticipant>();
 
         public static TacticalTeamCoordinator EnsureExists()
         {
@@ -62,8 +64,27 @@ namespace PolyStrike.AI
             Instance = this;
         }
 
+        private void Update()
+        {
+            var participants = MatchParticipant.All;
+            for (var i = 0; i < participants.Count; i++)
+            {
+                var participant = participants[i];
+                if (participant == null || !observedParticipants.Add(participant))
+                    continue;
+                participant.Died += OnParticipantDied;
+            }
+        }
+
         private void OnDestroy()
         {
+            foreach (var participant in observedParticipants)
+            {
+                if (participant != null)
+                    participant.Died -= OnParticipantDied;
+            }
+            observedParticipants.Clear();
+
             if (Instance == this)
                 Instance = null;
         }
@@ -193,6 +214,12 @@ namespace PolyStrike.AI
             var enemyCloserToOtherSite = Vector3.Distance(enemyPosition, ownAnchor) > 13f;
             var travelWouldMatter = Vector3.Distance(currentPosition, enemyPosition) > 5f;
             return enemyCloserToOtherSite && travelWouldMatter && Time.time - GetState(MatchTeam.CounterTerrorists).LastEnemySeenAt > 0.65f;
+        }
+
+        private void OnParticipantDied(MatchParticipant dead)
+        {
+            if (dead != null)
+                ReportTeammateDeath(dead.Team, dead.transform.position);
         }
 
         private TeamState GetState(MatchTeam team)
