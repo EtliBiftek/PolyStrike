@@ -16,11 +16,11 @@ namespace PolyStrike.Editor
 
             Directory.CreateDirectory("Assets/Scenes");
             Directory.CreateDirectory(outputDirectory);
+            BuildShaderKeeper.EnsureRuntimeShaders();
 
             var scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
 
-            // Unity refuses to create an additive scene while the active scene is still untitled.
-            // Save the bootstrap first, then add the generated network subscene content.
+            // Additive scene generation needs a real scene path in batchmode.
             if (!EditorSceneManager.SaveScene(scene, scenePath))
                 throw new InvalidOperationException("Build sahnesi ilk kez kaydedilemedi.");
 
