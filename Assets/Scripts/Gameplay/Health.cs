@@ -22,6 +22,7 @@ namespace PolyStrike.Gameplay
         public float Armor { get; private set; }
         public bool HasHelmet => hasHelmet;
         public bool IsDead { get; private set; }
+        public bool GodMode { get; private set; }
         public int DamageRevision { get; private set; }
         public Vector3 LastBulletDirection { get; private set; }
         public HitGroup LastHitGroup { get; private set; } = HitGroup.Chest;
@@ -41,6 +42,8 @@ namespace PolyStrike.Gameplay
 
         public BulletDamageResult TakeBulletDamage(BulletDamage bullet)
         {
+            if (GodMode)
+                return new BulletDamageResult(0, 0, false);
             if (IsDead || bullet.Damage <= 0f)
                 return new BulletDamageResult(0, 0, IsDead);
 
@@ -66,7 +69,7 @@ namespace PolyStrike.Gameplay
 
         public int TakeGrenadeDamage(float rawDamage, Vector3 blastDirection)
         {
-            if (IsDead || rawDamage <= 0f)
+            if (GodMode || IsDead || rawDamage <= 0f)
                 return 0;
 
             LastBulletDirection = blastDirection;
@@ -89,7 +92,7 @@ namespace PolyStrike.Gameplay
 
         public void TakeDamage(float amount)
         {
-            if (IsDead || amount <= 0f)
+            if (GodMode || IsDead || amount <= 0f)
                 return;
 
             var dealt = Mathf.Max(0, Mathf.FloorToInt(amount));
@@ -145,6 +148,13 @@ namespace PolyStrike.Gameplay
         public void SetDisableOnDeath(bool value)
         {
             disableOnDeath = value;
+        }
+
+        public void SetGodMode(bool enabled)
+        {
+            GodMode = enabled;
+            if (enabled && IsDead)
+                ResetForRound(false);
         }
 
         private (int HealthDamage, int ArmorDamage) ApplyArmoredDamage(float rawDamage, float armorRatio, bool armorProtected)
