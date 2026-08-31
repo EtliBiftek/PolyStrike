@@ -24,14 +24,8 @@ namespace PolyStrike.Networking
             var commandBuffer = new EntityCommandBuffer(Allocator.Temp);
             foreach (var (_, entity) in SystemAPI.Query<RefRO<NetworkStreamConnection>>().WithEntityAccess())
             {
-                if (SystemAPI.HasComponent<PolyStrikeConnectionAccepted>(entity))
-                {
-                    if (!SystemAPI.HasComponent<NetworkStreamInGame>(entity))
-                        commandBuffer.AddComponent<NetworkStreamInGame>(entity);
-                    continue;
-                }
-
-                if (SystemAPI.HasComponent<NetworkStreamRequestDisconnect>(entity))
+                if (SystemAPI.HasComponent<PolyStrikeConnectionAccepted>(entity) ||
+                    SystemAPI.HasComponent<NetworkStreamRequestDisconnect>(entity))
                     continue;
 
                 if (acceptedCount >= PolyStrikeNetcodeBootstrap.MaximumPlayers)
@@ -41,7 +35,6 @@ namespace PolyStrike.Networking
                 }
 
                 commandBuffer.AddComponent<PolyStrikeConnectionAccepted>(entity);
-                commandBuffer.AddComponent<NetworkStreamInGame>(entity);
                 acceptedCount++;
             }
 
