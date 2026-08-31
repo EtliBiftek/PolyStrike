@@ -1,40 +1,20 @@
+using PolyStrike.Maps;
 using Unity.Mathematics;
 
 namespace PolyStrike.Networking
 {
-    /// <summary>
-    /// Sandline is intentionally built from axis-aligned low-poly blocks. Keeping the online collision
-    /// description as plain data lets prediction and the server resolve the exact same geometry.
-    /// </summary>
     public static class NetworkSandlineCollision
     {
         public const float PlayerRadius = 0.35f;
         public const float StandingHeight = 1.829f;
         public const float CrouchingHeight = 1.372f;
-        public const float GroundY = 0.05f;
+        public const float GroundY = SandlineLayout.GroundY;
         public const float StepHeight = 0.30f;
 
         public enum Material : byte
         {
             Concrete,
             Wood
-        }
-
-        public readonly struct Block
-        {
-            public readonly float3 Center;
-            public readonly float3 Size;
-            public readonly Material Surface;
-
-            public Block(float3 center, float3 size, Material surface = Material.Concrete)
-            {
-                Center = center;
-                Size = size;
-                Surface = surface;
-            }
-
-            public float3 Min => Center - Size * 0.5f;
-            public float3 Max => Center + Size * 0.5f;
         }
 
         public readonly struct RayHit
@@ -53,36 +33,8 @@ namespace PolyStrike.Networking
             public float Thickness => math.max(0f, ExitDistance - EntryDistance);
         }
 
-        private static readonly Block[] Blocks =
-        {
-            new(new float3(0f, 1.5f, 29.5f), new float3(60f, 3f, 1f)),
-            new(new float3(0f, 1.5f, -29.5f), new float3(60f, 3f, 1f)),
-            new(new float3(-29.5f, 1.5f, 0f), new float3(1f, 3f, 60f)),
-            new(new float3(29.5f, 1.5f, 0f), new float3(1f, 3f, 60f)),
-
-            new(new float3(8.2f, 1.5f, -8f), new float3(1f, 3f, 20f)),
-            new(new float3(8.2f, 1.5f, 17f), new float3(1f, 3f, 12f)),
-            new(new float3(24f, 1.7f, 2f), new float3(4f, 3.4f, 32f)),
-
-            new(new float3(-8.5f, 1.5f, -7f), new float3(1f, 3f, 22f)),
-            new(new float3(-8.5f, 1.5f, 18f), new float3(1f, 3f, 10f)),
-            new(new float3(-24f, 1.7f, 2f), new float3(4f, 3.4f, 31f)),
-            new(new float3(-16f, 1.5f, 7.5f), new float3(8f, 3f, 1f)),
-
-            new(new float3(-4.8f, 1.5f, 8f), new float3(7.4f, 3f, 1f)),
-            new(new float3(4.8f, 1.5f, 8f), new float3(7.4f, 3f, 1f)),
-            new(new float3(-4.5f, 1.5f, -12f), new float3(8f, 3f, 1f)),
-            new(new float3(4.5f, 1.5f, -12f), new float3(8f, 3f, 1f)),
-            new(new float3(-1.8f, 1.5f, 13f), new float3(1.4f, 3f, 1.2f)),
-            new(new float3(1.8f, 1.5f, 13f), new float3(1.4f, 3f, 1.2f)),
-
-            new(new float3(18.7f, 0.73f, 14.9f), new float3(1.4f, 1.3f, 1.4f), Material.Wood),
-            new(new float3(14.6f, 0.63f, 16.6f), new float3(1.2f, 1.1f, 2f)),
-            new(new float3(-18f, 0.73f, 15.5f), new float3(2.2f, 1.3f, 1.2f), Material.Wood),
-            new(new float3(-14.5f, 0.63f, 13.2f), new float3(1.2f, 1.1f, 2f)),
-            new(new float3(2.4f, 0.55f, 2.5f), new float3(1.2f, 1.1f, 1.2f), Material.Wood),
-            new(new float3(13f, 0.65f, -5f), new float3(1.4f, 1.3f, 1.4f))
-        };
+        public static float3 GetSpawn(byte team, int slot) => SandlineLayout.GetSpawn(team, slot);
+        public static byte FindBombSite(float3 position) => SandlineLayout.FindBombSite(position);
 
         public static void SimulateMove(
             ref float3 position,
@@ -136,10 +88,13 @@ namespace PolyStrike.Networking
             var found = false;
             direction = math.normalizesafe(direction);
 
-            for (var i = 0; i < Blocks.Length; i++)
+            var blocks = SandlineLayout.SolidBlocks;
+            for (var i = 0; i < blocks.Length; i++)
             {
-                var block = Blocks[i];
-                if (!RayAabb(origin, direction, block.Min, block.Max, out var entry, out var exit))
+                var block = blocks[i];
+                var min = block.Center - block.Size * 0.5f;
+                var max = block.Center + block.Size * 0.5f;
+                if (!RayAabb(origin, direction, min, max, out var entry, out var exit))
                     continue;
 
                 if (exit < 0f || entry > maxDistance)
@@ -151,7 +106,7 @@ namespace PolyStrike.Networking
                     continue;
 
                 bestEntry = entry;
-                hit = new RayHit(entry, exit, block.Surface);
+                hit = new RayHit(entry, exit, ToNetworkMaterial(block.Surface));
                 found = true;
             }
 
@@ -170,15 +125,16 @@ namespace PolyStrike.Networking
             var target = start + delta;
             var perpendicular = xAxis ? position.z : position.x;
             var direction = math.sign(delta);
+            var blocks = SandlineLayout.SolidBlocks;
 
-            for (var i = 0; i < Blocks.Length; i++)
+            for (var i = 0; i < blocks.Length; i++)
             {
-                var block = Blocks[i];
-                if (!VerticalOverlap(position.y, height, block))
+                var block = blocks[i];
+                if (!VerticalOverlap(position.y, height, in block))
                     continue;
 
-                var min = block.Min;
-                var max = block.Max;
+                var min = block.Center - block.Size * 0.5f;
+                var max = block.Center + block.Size * 0.5f;
                 var perpendicularMin = (xAxis ? min.z : min.x) - PlayerRadius;
                 var perpendicularMax = (xAxis ? max.z : max.x) + PlayerRadius;
                 if (perpendicular < perpendicularMin || perpendicular > perpendicularMax)
@@ -231,14 +187,17 @@ namespace PolyStrike.Networking
         private static float FindLandingHeight(float2 horizontalPosition, float previousY, float targetY)
         {
             var support = GroundY;
-            for (var i = 0; i < Blocks.Length; i++)
+            var blocks = SandlineLayout.SolidBlocks;
+            for (var i = 0; i < blocks.Length; i++)
             {
-                var block = Blocks[i];
-                var top = block.Max.y;
+                var block = blocks[i];
+                var min = block.Center - block.Size * 0.5f;
+                var max = block.Center + block.Size * 0.5f;
+                var top = max.y;
                 if (top > previousY + 0.01f || top < targetY - 0.01f)
                     continue;
 
-                if (CircleOverlapsRect(horizontalPosition, block.Min.xz, block.Max.xz, PlayerRadius))
+                if (CircleOverlapsRect(horizontalPosition, min.xz, max.xz, PlayerRadius))
                     support = math.max(support, top);
             }
 
@@ -248,14 +207,17 @@ namespace PolyStrike.Networking
         private static float FindSupportHeight(float2 horizontalPosition, float feetY)
         {
             var support = GroundY;
-            for (var i = 0; i < Blocks.Length; i++)
+            var blocks = SandlineLayout.SolidBlocks;
+            for (var i = 0; i < blocks.Length; i++)
             {
-                var block = Blocks[i];
-                var top = block.Max.y;
+                var block = blocks[i];
+                var min = block.Center - block.Size * 0.5f;
+                var max = block.Center + block.Size * 0.5f;
+                var top = max.y;
                 if (top > feetY + 0.02f)
                     continue;
 
-                if (CircleOverlapsRect(horizontalPosition, block.Min.xz, block.Max.xz, PlayerRadius))
+                if (CircleOverlapsRect(horizontalPosition, min.xz, max.xz, PlayerRadius))
                     support = math.max(support, top);
             }
 
@@ -264,26 +226,31 @@ namespace PolyStrike.Networking
 
         private static bool HasCeiling(float2 horizontalPosition, float feetY, float headY, int ignoredBlock)
         {
-            for (var i = 0; i < Blocks.Length; i++)
+            var blocks = SandlineLayout.SolidBlocks;
+            for (var i = 0; i < blocks.Length; i++)
             {
                 if (i == ignoredBlock)
                     continue;
 
-                var block = Blocks[i];
-                if (block.Max.y <= feetY || block.Min.y >= headY)
+                var block = blocks[i];
+                var min = block.Center - block.Size * 0.5f;
+                var max = block.Center + block.Size * 0.5f;
+                if (max.y <= feetY || min.y >= headY)
                     continue;
 
-                if (CircleOverlapsRect(horizontalPosition, block.Min.xz, block.Max.xz, PlayerRadius))
+                if (CircleOverlapsRect(horizontalPosition, min.xz, max.xz, PlayerRadius))
                     return true;
             }
 
             return false;
         }
 
-        private static bool VerticalOverlap(float feetY, float height, in Block block)
+        private static bool VerticalOverlap(float feetY, float height, in SandlineBlock block)
         {
+            var minY = block.Center.y - block.Size.y * 0.5f;
+            var maxY = block.Center.y + block.Size.y * 0.5f;
             var headY = feetY + height;
-            return headY > block.Min.y + 0.001f && feetY < block.Max.y - 0.001f;
+            return headY > minY + 0.001f && feetY < maxY - 0.001f;
         }
 
         private static bool CircleOverlapsRect(float2 center, float2 min, float2 max, float radius)
@@ -320,6 +287,11 @@ namespace PolyStrike.Networking
             }
 
             return true;
+        }
+
+        private static Material ToNetworkMaterial(SandlineSurface surface)
+        {
+            return surface == SandlineSurface.Wood ? Material.Wood : Material.Concrete;
         }
     }
 }
