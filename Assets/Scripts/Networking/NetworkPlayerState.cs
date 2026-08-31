@@ -1,3 +1,4 @@
+using Unity.Collections;
 using Unity.Entities;
 using Unity.Mathematics;
 using Unity.NetCode;
@@ -6,6 +7,7 @@ namespace PolyStrike.Networking
 {
     public struct NetworkPlayerState : IComponentData
     {
+        [GhostField] public FixedString128Bytes PlayerName;
         [GhostField(Quantization = 1000)] public float3 Position;
         [GhostField(Quantization = 1000)] public float3 Velocity;
         [GhostField(Quantization = 100)] public float Yaw;
@@ -17,6 +19,7 @@ namespace PolyStrike.Networking
         [GhostField] public ushort Money;
         [GhostField] public ushort Kills;
         [GhostField] public ushort Deaths;
+        [GhostField] public ushort PingMs;
         [GhostField] public byte Team;
         [GhostField] public byte ActiveWeapon;
         [GhostField] public byte MagazineAmmo;
