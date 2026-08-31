@@ -1,4 +1,3 @@
-using Unity.Entities;
 using Unity.NetCode;
 using UnityEngine;
 using UnityEngine.Scripting;
@@ -14,11 +13,10 @@ namespace PolyStrike.Networking
 
         public override bool Initialize(string defaultWorldName)
         {
-            // A competitive server must keep ticking while its window is unfocused or headless.
+            // Network simulation must continue when the game loses focus or runs headless.
             Application.runInBackground = true;
 
 #if UNITY_EDITOR
-            // Multiplayer Play Mode can immediately run one server and one client for iteration.
             AutoConnectPort = DefaultGamePort;
 #endif
 
@@ -29,20 +27,18 @@ namespace PolyStrike.Networking
 
         private static void ConfigureServerTickRate()
         {
-            foreach (var world in World.All)
-            {
-                if (!world.IsServer())
-                    continue;
+            var serverWorld = ServerWorld;
+            if (serverWorld == null || !serverWorld.IsCreated)
+                return;
 
-                var tickRate = new ClientServerTickRate
-                {
-                    SimulationTickRate = SimulationTickRate,
-                    NetworkTickRate = SimulationTickRate,
-                    MaxSimulationStepsPerFrame = 4
-                };
-                tickRate.ResolveDefaults();
-                world.EntityManager.CreateSingleton(tickRate);
-            }
+            var tickRate = new ClientServerTickRate
+            {
+                SimulationTickRate = PolyStrikeNetcodeBootstrap.SimulationTickRate,
+                NetworkTickRate = PolyStrikeNetcodeBootstrap.SimulationTickRate,
+                MaxSimulationStepsPerFrame = 4
+            };
+            tickRate.ResolveDefaults();
+            serverWorld.EntityManager.CreateSingleton(tickRate);
         }
     }
 }
