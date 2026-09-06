@@ -7,7 +7,7 @@ on:
     tags: ["v*"]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -62,3 +62,89 @@ jobs:
           name: PolyStrike-Windows-x64
           path: build/Windows
           if-no-files-found: error
+
+      - name: Prepare portable archive
+        if: startsWith(github.ref, 'refs/tags/v') && steps.unity_credentials.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -e
+          echo "== build output =="
+          ls -R build || true
+          if [ ! -d "build/Windows" ]; then
+            echo "build/Windows not found, portable archive cannot be created"
+            exit 1
+          fi
+          echo "Creating portable zip (exe at zip root)..."
+          # Create portable zip with files at root for easy extraction
+          rm -f PolyStrike-Portable.zip
+          (cd build/Windows && zip -r ../../PolyStrike-Portable.zip . -x "*.meta" > /dev/null)
+          ls -lh PolyStrike-Portable.zip
+          unzip -l PolyStrike-Portable.zip | head -n 30
+          echo "Portable zip created: $(du -h PolyStrike-Portable.zip | cut -f1)"
+
+      - name: Create NSIS installer
+        if: startsWith(github.ref, 'refs/tags/v') && steps.unity_credentials.outputs.ready == 'true'
+        shell: bash
+        run: |
+          set -e
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq nsis > /dev/null
+          echo "makensis version: $(makensis -VERSION)"
+
+          cat > installer.nsi << 'NSIEOF'
+          Unicode True
+          Name "PolyStrike"
+          OutFile "PolyStrike-Setup.exe"
+          InstallDir "$PROGRAMFILES\PolyStrike"
+          InstallDirRegKey HKLM "Software\PolyStrike" "InstallDir"
+          RequestExecutionLevel admin
+
+          !include "MUI2.nsh"
+          !define MUI_ABORTWARNING
+          !insertmacro MUI_PAGE_WELCOME
+          !insertmacro MUI_PAGE_DIRECTORY
+          !insertmacro MUI_PAGE_INSTFILES
+          !define MUI_FINISHPAGE_RUN "$INSTDIR\PolyStrike.exe"
+          !insertmacro MUI_PAGE_FINISH
+          !insertmacro MUI_UNPAGE_CONFIRM
+          !insertmacro MUI_UNPAGE_INSTFILES
+          !insertmacro MUI_LANGUAGE "English"
+          !insertmacro MUI_LANGUAGE "Turkish"
+
+          Section "PolyStrike"
+            SetOutPath "$INSTDIR"
+            File /r "build/Windows/*.*"
+            WriteRegStr HKLM "Software\PolyStrike" "InstallDir" "$INSTDIR"
+            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\PolyStrike" "DisplayName" "PolyStrike"
+            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\PolyStrike" "UninstallString" "$INSTDIR\Uninstall.exe"
+            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\PolyStrike" "DisplayIcon" "$INSTDIR\PolyStrike.exe"
+            WriteRegStr HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\PolyStrike" "DisplayVersion" "${GITHUB_REF_NAME}"
+            WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\PolyStrike" "NoModify" 1
+            WriteRegDWORD HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\PolyStrike" "NoRepair" 1
+            WriteUninstaller "$INSTDIR\Uninstall.exe"
+            CreateShortCut "$DESKTOP\PolyStrike.lnk" "$INSTDIR\PolyStrike.exe"
+            CreateShortCut "$SMPROGRAMS\PolyStrike.lnk" "$INSTDIR\PolyStrike.exe"
+          SectionEnd
+
+          Section "Uninstall"
+            Delete "$DESKTOP\PolyStrike.lnk"
+            Delete "$SMPROGRAMS\PolyStrike.lnk"
+            RMDir /r "$INSTDIR"
+            DeleteRegKey HKLM "Software\Microsoft\Windows\CurrentVersion\Uninstall\PolyStrike"
+            DeleteRegKey HKLM "Software\PolyStrike"
+          SectionEnd
+          NSIEOF
+
+          cat installer.nsi
+          makensis installer.nsi
+          ls -lh PolyStrike-Setup.exe
+
+      - name: Publish Release Assets
+        if: startsWith(github.ref, 'refs/tags/v') && steps.unity_credentials.outputs.ready == 'true'
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            PolyStrike-Portable.zip
+            PolyStrike-Setup.exe
+          fail_on_unmatched_files: true
+          generate_release_notes: true
