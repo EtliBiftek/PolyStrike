@@ -43,16 +43,12 @@ namespace PolyStrike.Networking
 
         private static void ConfigureLagCompensationHistory()
         {
-            // History size must cover the rewind window used by ServerRewindPhysics (13 ticks ≈ 200 ms at 64 Hz)
-            // plus a small margin for interpolation. 32 ticks ≈ 500 ms keeps memory low while allowing full unlag.
-            const uint historySize = 32u;
-
             var serverWorld = ServerWorld;
             if (serverWorld != null && serverWorld.IsCreated)
             {
                 serverWorld.EntityManager.CreateSingleton(new LagCompensationConfig
                 {
-                    ServerHistorySize = historySize,
+                    ServerHistorySize = 0,
                     ClientHistorySize = 1
                 });
             }

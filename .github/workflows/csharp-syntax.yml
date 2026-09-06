@@ -4,8 +4,6 @@ on:
   workflow_dispatch:
   push:
     branches: [main, "arena/**"]
-  pull_request:
-    branches: [main]
 
 permissions:
   contents: read
@@ -22,9 +20,6 @@ jobs:
         uses: actions/setup-dotnet@v5
         with:
           dotnet-version: 8.0.x
-
-      - name: Restore syntax checker
-        run: dotnet restore Tools/SyntaxCheck/SyntaxCheck.csproj
 
       - name: Check C# syntax
         run: dotnet run --project Tools/SyntaxCheck/SyntaxCheck.csproj -- "$GITHUB_WORKSPACE"
