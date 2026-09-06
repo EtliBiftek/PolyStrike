@@ -58,7 +58,7 @@ namespace PolyStrike.Core
 
             EnsureStyles();
             var width = Mathf.Min(460f, Screen.width - 48f);
-            var height = settingsOpen ? 430f : 340f;
+            var height = settingsOpen ? 470f : 340f;
             var rect = new Rect((Screen.width - width) * 0.5f, Mathf.Max(24f, (Screen.height - height) * 0.5f), width, height);
             GUI.Box(rect, GUIContent.none);
 
