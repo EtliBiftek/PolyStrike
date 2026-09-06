@@ -12,10 +12,17 @@ namespace PolyStrike.Core
         public static string CurrentLanguage { get; private set; } = "tr";
         public static event Action LanguageChanged;
 
+        private const string LanguagePreferenceKey = "polystrike.language";
+
         [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
         private static void LoadDefaultLanguage()
         {
-            Load("tr");
+            var preferred = PlayerPrefs.GetString(LanguagePreferenceKey, "tr");
+            if (!Load(preferred))
+                Load("tr");
+
+            // Keep PlayerPrefs in sync for next launch
+            PlayerPrefs.SetString(LanguagePreferenceKey, CurrentLanguage);
         }
 
         public static bool Load(string languageCode)
@@ -23,10 +30,19 @@ namespace PolyStrike.Core
             if (string.IsNullOrWhiteSpace(languageCode))
                 return false;
 
+            languageCode = languageCode.Trim().ToLowerInvariant();
+
             var path = Path.Combine(Application.streamingAssetsPath, "Languages", $"{languageCode}.txt");
             if (!File.Exists(path))
             {
-                Debug.LogError($"Dil dosyası bulunamadı: {path}");
+                // Fallback to tr if requested language missing; log as warning instead of error to avoid spamming console
+                if (!string.Equals(languageCode, "tr", StringComparison.OrdinalIgnoreCase))
+                {
+                    Debug.LogWarning($"Dil dosyası bulunamadı: {path} — 'tr' fallback deneniyor.");
+                    return Load("tr");
+                }
+
+                Debug.LogWarning($"Dil dosyası bulunamadı: {path}");
                 return false;
             }
 
@@ -54,6 +70,8 @@ namespace PolyStrike.Core
                 Entries[pair.Key] = pair.Value;
 
             CurrentLanguage = languageCode;
+            PlayerPrefs.SetString(LanguagePreferenceKey, languageCode);
+            PlayerPrefs.Save();
             LanguageChanged?.Invoke();
             return true;
         }

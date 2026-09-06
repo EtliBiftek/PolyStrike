@@ -182,6 +182,8 @@ namespace PolyStrike.Core
             commands["volume"] = Volume;
             commands["fps_max"] = FpsMax;
             commands["cl_showfps"] = ShowFps;
+            commands["language"] = Language;
+            commands["lang"] = Language;
 
             commands["connect"] = Connect;
             commands["disconnect"] = _ => Disconnect();
@@ -483,6 +485,26 @@ namespace PolyStrike.Core
             }
             CompetitiveCvars.SetShowFps(value);
             Print("cl_showfps = " + CompetitiveCvars.ShowFps);
+        }
+
+        private void Language(IReadOnlyList<string> args)
+        {
+            if (args.Count == 0)
+            {
+                Print("language = " + Localization.CurrentLanguage);
+                Print("Available: " + string.Join(", ", Localization.GetAvailableLanguages()));
+                return;
+            }
+            var code = args[0].Trim().ToLowerInvariant();
+            if (code != "tr" && code != "en")
+            {
+                PrintUsage("language <tr/en>");
+                return;
+            }
+            if (Localization.Load(code))
+                Print("language = " + Localization.CurrentLanguage);
+            else
+                Print(string.Format(Localization.Get("console.exec_missing"), code));
         }
 
         private void Connect(IReadOnlyList<string> args)

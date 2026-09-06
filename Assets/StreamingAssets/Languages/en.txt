@@ -1,0 +1,174 @@
+# PolyStrike - English
+# Copy this file to add a new language, e.g., de.txt.
+
+prototype.title=PolyStrike - CS2 Feel Prototype
+prototype.controls=WASD: Move | Shift: Walk | Space: Jump | Ctrl/C: Crouch | K: Team Voice | Tab: Scoreboard | ~: Console | 1: Primary | 2: Pistol | 4: Utility | 5: C4 | 6: HE | 7: Flash | 8: Smoke | 0: Molotov | Mouse1/E: Plant | E: Defuse | G: Drop Item | B: Buy | R: Reload
+
+team.t=T
+team.ct=CT
+
+hud.health=Health: {0}
+hud.armor=Armor: {0}
+hud.money=${0}
+hud.ammo=Ammo: {0} / {1}
+hud.reloading=Reloading...
+hud.deploying=Deploying...
+hud.speed=Speed: {0} u/s
+hud.velocity_modifier=Tag speed: x{0:0.00}
+hud.inaccuracy=Inaccuracy: {0:0.0000}
+hud.utility={0} x{1}
+hud.utility_throw=Throw: {0}
+hud.c4_equipped=C4
+hud.c4_hint=Plant with Mouse1 or E inside bombsite
+hud.bomb_damage_preview=C4 Damage: -{0}
+hud.score=T {0}  -  {1} CT
+hud.round=Round {0}/{1}
+hud.bomb_timer=C4: {0:0.0}s
+hud.planting=Planting C4... {0}%
+hud.defusing=Defusing C4... {0}%
+hud.round_winner={0} won the round - {1}
+
+scoreboard.title=SCOREBOARD
+scoreboard.player=Player {0}
+scoreboard.you={0} (You)
+scoreboard.alive=Alive
+scoreboard.dead=Dead
+scoreboard.kills=Kills
+scoreboard.deaths=Deaths
+scoreboard.ping=Ping
+scoreboard.status=Status
+
+spectator.watching=Spectating: {0}
+spectator.no_teammates=No alive teammate to spectate
+spectator.controls=Mouse1/Mouse2: Switch player | Space: Camera mode
+spectator.mode.firstperson=First Person
+spectator.mode.chase=Chase Cam
+
+voice.transmitting=TEAM VOICE  •  TRANSMITTING
+voice.speaking=VOICE  •  {0}
+voice.status.starting=Starting team voice...
+voice.status.ready=Team voice ready
+voice.status.unavailable=Team voice unavailable
+
+killfeed.headshot=HEADSHOT
+killfeed.teamkill=TEAMKILL
+killfeed.suicide=SUICIDE
+killfeed.c4=C4
+killfeed.unknown_weapon=KILL
+
+match.phase.freeze=Freeze Time
+match.phase.live=Round Live
+match.phase.postplant=C4 Planted
+match.phase.round_end=Round Over
+match.phase.halftime=Halftime
+match.phase.match_end=Match Over
+match.reason.elimination=Enemy team eliminated
+match.reason.time=Time expired
+match.reason.explosion=C4 exploded
+match.reason.defuse=C4 defused
+match.draw=Match ended 12-12 draw
+match.winner={0} won the match
+
+weapon.t_rifle=T Rifle
+weapon.ct_rifle=CT Rifle
+weapon.t_pistol=T Pistol
+weapon.ct_pistol=CT Pistol
+
+grenade.he=HE Grenade
+grenade.flash=Flashbang
+grenade.smoke=Smoke Grenade
+grenade.molotov=Molotov
+grenade.throw.full=Long
+grenade.throw.medium=Medium
+grenade.throw.short=Short
+
+buy.title=BUY MENU
+buy.money=${0}
+buy.primary_section=PRIMARY
+buy.equipment_section=EQUIPMENT
+buy.utility_section=UTILITY
+buy.t_rifle=T Rifle
+buy.ct_rifle=CT Rifle
+buy.kevlar=Kevlar
+buy.helmet=Kevlar + Helmet
+buy.defuse_kit=Defuse Kit
+buy.he=HE Grenade
+buy.flash=Flashbang
+buy.smoke=Smoke Grenade
+buy.molotov=Molotov
+buy.incendiary=Incendiary
+buy.item_price={0}  -  ${1}
+buy.item_count_price={0} x{1}  -  ${2}
+buy.item_owned={0}  -  OWNED
+buy.refund=Refund last eligible purchase  +${0}
+buy.close_hint=Press B or Esc to close
+
+network.title=POLYSTRIKE ONLINE
+network.player_name=Player name
+network.default_name=Player
+network.address=Server IPv4 address
+network.host=Create Server
+network.join=Join Server
+network.status.ready=Waiting for connection
+network.status.world_error=Network world creation failed
+network.status.hosting=Hosting server...
+network.status.invalid_address=Invalid IPv4 address
+network.status.connecting=Connecting to server...
+network.status.failed=Connection failed
+network.retry=Retry
+network.port_hint=UDP port: {0}
+network.waiting=Waiting for players...
+network.connected=Connected
+network.buy_hint=B: Buy
+network.bomb_carrier=You have the C4
+network.plant_hint=Press 5 + Mouse1/E in bombsite to plant
+network.defuse_hint=Press E to defuse C4
+network.round_winner={0} won the round
+network.local_team=Team: {0}
+network.player_count=Players: {0}/10
+network.phase_time={0} | {1}s
+
+console.title=POLYSTRIKE DEVELOPER CONSOLE
+console.ready=Console ready. Type help for commands.
+console.hint=Enter: Execute | Up/Down: History | Tab: Autocomplete | ~ or Esc: Close
+console.unknown=Unknown command: {0}
+console.error=Command error: {0}
+console.usage=Usage: {0}
+console.command_list=Available commands:
+console.cheats_required=sv_cheats 1 required for this command.
+console.restart=Match will restart in {0:0.##} seconds.
+console.map_unknown=Map not found: {0}
+console.ok=OK.
+console.no_bot=No bot to place.
+console.team_full=This team is full.
+console.offline_only=This practice command is available in local bot match only.
+console.give_unknown=Item not supported yet: {0}
+console.connecting=Connecting to {0}...
+console.disconnected=Disconnecting...
+console.status_players=Players: {0}
+console.bad_key=Invalid key: {0}
+console.not_bound=Key not bound.
+console.exec_missing=CFG not found: {0}
+console.exec_done=CFG executed: {0}
+
+start.title=POLYSTRIKE
+start.subtitle=Low-poly competitive 5v5 alpha
+start.offline=PLAY 5v5 WITH BOTS
+start.online=PLAY ONLINE
+start.console_hint=Press ~ to open the developer console.
+
+pause.title=PAUSED
+pause.resume=RESUME
+pause.settings=SETTINGS
+pause.console=OPEN CONSOLE
+pause.sensitivity=Sensitivity: {0}
+pause.volume=Master volume: {0}%
+pause.fps=FPS limit: {0}
+pause.unlimited=Unlimited
+pause.fullscreen_on=Fullscreen: On
+pause.fullscreen_off=Fullscreen: Off
+pause.back=BACK
+
+menu.play=Play
+menu.settings=Settings
+menu.exit=Exit

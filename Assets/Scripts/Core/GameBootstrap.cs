@@ -187,6 +187,7 @@ namespace PolyStrike.Core
             deathResponse.SetUtility(utility);
 
             participant.SetLoadoutReferences(weapon, utility);
+            CreateBotHitboxRig(player.transform, health, MatchTeam.Terrorists);
             player.AddComponent<C4Controller>();
             player.AddComponent<BuyMenu>();
             player.AddComponent<DebugHud>();

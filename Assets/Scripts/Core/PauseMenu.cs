@@ -123,6 +123,14 @@ namespace PolyStrike.Core
             if (GUILayout.Button(fullscreenLabel, GUILayout.Height(40f)))
                 Screen.fullScreen = !Screen.fullScreen;
 
+            GUILayout.Space(12f);
+            var langLabel = Localization.CurrentLanguage == "tr" ? "Dil: Türkçe (EN için tıkla)" : "Language: English (click for TR)";
+            if (GUILayout.Button(langLabel, GUILayout.Height(36f)))
+            {
+                var next = Localization.CurrentLanguage == "tr" ? "en" : "tr";
+                Localization.Load(next);
+            }
+
             GUILayout.FlexibleSpace();
             if (GUILayout.Button(Localization.Get("pause.back"), GUILayout.Height(40f)))
                 settingsOpen = false;

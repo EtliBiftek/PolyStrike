@@ -156,9 +156,11 @@ namespace PolyStrike.Core
 
         private void DrawSettings()
         {
-            var volumePercent = Mathf.RoundToInt(AudioListener.volume * 100f);
+            var volumePercent = Mathf.RoundToInt(CompetitiveCvars.Volume * 100f);
             GUILayout.Label(string.Format(Localization.Get("pause.volume"), volumePercent), labelStyle);
-            AudioListener.volume = GUILayout.HorizontalSlider(AudioListener.volume, 0f, 1f, GUILayout.Height(28f));
+            var newVolume = GUILayout.HorizontalSlider(CompetitiveCvars.Volume, 0f, 1f, GUILayout.Height(28f));
+            if (!Mathf.Approximately(newVolume, CompetitiveCvars.Volume))
+                CompetitiveCvars.SetVolume(newVolume);
 
             GUILayout.Space(18f);
             var fullscreenKey = Screen.fullScreen ? "pause.fullscreen_on" : "pause.fullscreen_off";
@@ -169,29 +171,47 @@ namespace PolyStrike.Core
             if (GUILayout.Button(GetFpsLabel(), secondaryButtonStyle, GUILayout.Height(48f)))
                 CycleFpsLimit();
 
-            GUILayout.Space(26f);
+            GUILayout.Space(14f);
+            GUILayout.Label(string.Format(Localization.Get("pause.sensitivity"), CompetitiveCvars.Sensitivity.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)), labelStyle);
+            var newSense = GUILayout.HorizontalSlider(CompetitiveCvars.Sensitivity, 0.10f, 4f, GUILayout.Height(22f));
+            if (!Mathf.Approximately(newSense, CompetitiveCvars.Sensitivity))
+                CompetitiveCvars.SetSensitivity(newSense);
+
+            GUILayout.Space(14f);
+            GUILayout.BeginHorizontal();
+            var langButton = Localization.CurrentLanguage == "tr" ? "TR  /  EN" : "EN  /  TR";
+            if (GUILayout.Button(langButton, secondaryButtonStyle, GUILayout.Height(44f)))
+            {
+                var next = Localization.CurrentLanguage == "tr" ? "en" : "tr";
+                Localization.Load(next);
+            }
             if (GUILayout.Button(Localization.Get("pause.back"), secondaryButtonStyle, GUILayout.Height(44f)))
                 page = MenuPage.Home;
+            GUILayout.EndHorizontal();
         }
 
         private static string GetFpsLabel()
         {
-            var value = Application.targetFrameRate <= 0
+            var fps = CompetitiveCvars.FpsMax;
+            var value = fps <= 0
                 ? Localization.Get("pause.unlimited")
-                : Application.targetFrameRate.ToString();
+                : fps.ToString();
             return string.Format(Localization.Get("pause.fps"), value);
         }
 
         private static void CycleFpsLimit()
         {
-            if (Application.targetFrameRate <= 0)
-                Application.targetFrameRate = 144;
-            else if (Application.targetFrameRate < 240)
-                Application.targetFrameRate = 240;
-            else if (Application.targetFrameRate < 360)
-                Application.targetFrameRate = 360;
+            var current = CompetitiveCvars.FpsMax;
+            int next;
+            if (current <= 0)
+                next = 144;
+            else if (current < 240)
+                next = 240;
+            else if (current < 360)
+                next = 360;
             else
-                Application.targetFrameRate = -1;
+                next = 0;
+            CompetitiveCvars.SetFpsMax(next);
         }
 
         private void StartOffline()
